@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regelstruktur{% if name %} – {{ name }}{% endif %}</title>
+<script>
+  // Følg systemets lyse/mørke tema (Bootstrap styres af data-bs-theme)
+  (() => {
+    const dark = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => document.documentElement.dataset.bsTheme = dark.matches ? "dark" : "light";
+    apply();
+    dark.addEventListener("change", apply);
+  })();
+</script>
+<!-- Bootstrap ligger lokalt i static/, så siden virker uden internetadgang -->
+<link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+<style>
+  :root {
+    --data: #4a3b00; --data-bg: #ffe866; --field: #0b7285; --field-bg: #e3f4f7; --rule: #9a5b00; --rule-bg: #fdf1d8; --op: #a21caf;
+    --c0: #2563eb; --c1: #15803d; --c2: #9333ea; --c3: #c2410c; --c4: #0e7490; --bad: #b91c1c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --top: 4.25rem;  /* plads til den faste bjælke øverst */
+  }
+  [data-bs-theme="dark"] {
+    --data: #ffe680; --data-bg: #5e4d00; --field: #66d9e8; --field-bg: #12343b; --rule: #f0b860; --rule-bg: #3a2c12; --op: #e879f9;
+    --c0: #7aa2ff; --c1: #5fd08a; --c2: #c79bff; --c3: #ff9b6a; --c4: #5cc8dc; --bad: #ff7b7b;
+  }
+  [hidden] { display: none !important; }
+  .page { max-width: 1500px; }
+  .navbar-brand { font-weight: 700; letter-spacing: -.01em; }
+  .brand-mark { color: var(--c0); font-family: var(--mono); }
+  .filename { max-width: 28rem; overflow: hidden; text-overflow: ellipsis; }
+
+  .dropzone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15rem;
+              padding: 1.75rem 1rem; border: 2px dashed var(--bs-border-color); border-radius: var(--bs-border-radius-lg);
+              color: var(--bs-secondary-color); text-align: center; cursor: pointer;
+              transition: border-color .15s, background-color .15s, color .15s; }
+  .dropzone.compact { flex-direction: row; gap: .6rem; padding: .6rem 1rem; }
+  .dropzone:hover, .dropzone:focus-within { border-color: var(--bs-primary); color: var(--bs-body-color);
+                                             background: var(--bs-primary-bg-subtle); }
+  .dropzone strong { color: var(--bs-body-color); }
+  .dropzone svg { width: 2rem; height: 2rem; color: var(--bs-primary); }
+  .dropzone.compact svg { width: 1.25rem; height: 1.25rem; }
+  details.paste > summary { color: var(--bs-secondary-color); font-size: .875rem; }
+  textarea.form-control { min-height: 150px; font: 12.5px/1.5 var(--mono); }
+  body.dragging::after { content: "Slip filen for at vise den"; position: fixed; inset: 12px; z-index: 2000;
+                         display: flex; align-items: center; justify-content: center; pointer-events: none;
+                         border: 3px dashed var(--bs-primary); border-radius: 16px; color: var(--bs-primary);
+                         background: color-mix(in srgb, var(--bs-body-bg) 88%, transparent);
+                         font-size: 1.5rem; font-weight: 700; }
+
+  .layout { display: grid; grid-template-columns: var(--index-width, 380px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+  .layout.no-index { grid-template-columns: minmax(0, 1fr); }
+  .index { position: sticky; top: var(--top); max-height: calc(100vh - var(--top) - 1rem); min-width: 0;
+           display: flex; flex-direction: column; font-size: .8125rem; }
+  .index .card-body { overflow: auto; }
+  /* Håndtag i mellemrummet til højre for indekset: træk for at ændre bredden */
+  .resizer { position: absolute; top: 0; bottom: 0; right: -1rem; width: 1rem; cursor: col-resize; touch-action: none; }
+  .resizer::after { content: ""; position: absolute; top: .75rem; bottom: .75rem; left: calc(50% - 2px); width: 4px;
+                    border-radius: 2px; background: var(--bs-border-color); opacity: 0; transition: opacity .15s; }
+  .resizer:hover::after, .resizer:focus-visible::after, .resizing .resizer::after { opacity: 1; background: var(--bs-primary); }
+  .resizing { cursor: col-resize; user-select: none; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .index { position: static; max-height: 45vh; }
+    .resizer { display: none; }
+  }
+  .index li { display: flex; align-items: center; gap: .45rem; padding: .12rem .35rem .12rem calc(.35rem + var(--indent) * .8rem);
+              border-radius: var(--bs-border-radius-sm); }
+  .index li:hover { background: var(--bs-tertiary-bg); }
+  .index li.heading:not(:first-child) { margin-top: .3rem; }
+  .index .form-check-input { flex: none; margin: 0; cursor: pointer; }
+  .index a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+             color: var(--bs-body-color); text-decoration: none; }
+  .index a:hover { text-decoration: underline; }
+  .index .heading a { font-weight: 600; }
+  .index .block a { color: var(--c0); font-family: var(--mono); font-size: .75rem; }
+  .index li.off a { color: var(--bs-secondary-color); opacity: .6; }
+  .index li.all-struck a { text-decoration: line-through; }
+  .index a span { padding: 0; background: none; color: inherit; font-weight: inherit; font-size: inherit; }
+  .flash { animation: flash 1.8s ease-out; }
+  @keyframes flash { from, 40% { background: var(--bs-warning-bg-subtle); box-shadow: 0 0 0 2px var(--bs-warning); } }
+  .nav-tabs .nav-link { color: var(--bs-secondary-color); }
+  .nav-tabs .nav-link.active { color: var(--bs-body-color); font-weight: 600; }
+  .overview table { font-size: .8125rem; }
+  .overview th { position: sticky; top: var(--top); z-index: 1; background: var(--bs-body-bg); white-space: nowrap;
+                 box-shadow: inset 0 -1px var(--bs-border-color); }
+  .overview td.code { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+  .overview .num { width: 1%; padding-inline: 1rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .overview td:first-child, .overview th:first-child { padding-left: 1rem; }
+  .overview tr.all-struck td.code { text-decoration: line-through; text-decoration-color: var(--bad); }
+  .overview .data-code { color: var(--data); background: var(--data-bg); border-radius: 3px; padding: 0 3px; }
+  .overview .rule-code { color: var(--rule); background: var(--rule-bg); border-radius: 3px; padding: 0 3px; }
+  #context { position: fixed; z-index: 1500; font-size: .875rem; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; color: var(--bs-secondary-color);
+            font: 12px/1.6 var(--mono); }
+  .tree { font: 13px/1.6 var(--mono); overflow-x: auto; }
+  .d0 { --c: var(--c0); } .d1 { --c: var(--c1); } .d2 { --c: var(--c2); } .d3 { --c: var(--c3); } .d4 { --c: var(--c4); }
+  details.block { margin: 4px 0; border-left: 3px solid var(--c); border-radius: 4px; scroll-margin-top: var(--top); }
+  details.block > summary { padding: 2px 8px; color: var(--c); border-radius: 0 4px 4px 0;
+                            background: color-mix(in srgb, var(--c) 9%, transparent); }
+  details.block > summary:hover { background: color-mix(in srgb, var(--c) 16%, transparent); }
+  .label { font-weight: 700; }
+  .clause { color: var(--bs-body-color); }
+  .clause.more { display: block; padding-left: 2.2em; }
+  .body { padding: 2px 0 2px 16px; }
+  .closer { padding: 0 8px; color: var(--c); opacity: .75; }
+  .closer.missing { color: var(--bad); opacity: 1; font-weight: 600; }
+  .missing-tag { float: right; margin-left: 1rem; padding: 0 .5em; border-radius: 999px; background: var(--bad);
+                 color: var(--bs-body-bg); font: 700 11px/1.7 var(--bs-body-font-family); letter-spacing: .03em; }
+  .line { min-height: 1.6em; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .heading { margin: 1.1em 0 .35em; font-family: var(--bs-body-font-family); font-weight: 700; line-height: 1.25;
+             letter-spacing: -.01em; overflow-wrap: anywhere; scroll-margin-top: var(--top); }
+  .heading:first-child { margin-top: 0; }
+  .lv1 { font-size: 1.75rem; padding-bottom: .2em; border-bottom: 1px solid var(--bs-border-color); }
+  .lv2 { font-size: 1.375rem; } .lv3 { font-size: 1.15rem; } .lv4 { font-size: 1rem; }
+  .lv5, .lv6, .lv7, .lv8, .lv9 { font-size: .9rem; color: var(--bs-secondary-color); }
+  .field { color: var(--field); background: var(--field-bg); border-radius: 3px; padding: 0 2px; }
+  .field .field { background: none; padding: 0; }
+  .field.data, .field .field.data { color: var(--data); background: var(--data-bg); padding: 0 2px; }
+  .field.data .field { color: inherit; }
+  .table-wrap { margin: 6px 0; overflow-x: auto; }
+  .tree table { width: auto; max-width: 100%; margin: 0; border-collapse: collapse; }
+  .tree td { padding: 3px 8px; border: 1px solid var(--bs-border-color); vertical-align: top;
+             white-space: pre-wrap; overflow-wrap: anywhere; }
+  .rule { color: var(--rule); background: var(--rule-bg); border-radius: 3px; }
+  .ref { color: var(--bs-secondary-color); font-size: .88em; }
+  .op { color: var(--op); font-weight: 700; }
+  .strike { text-decoration: line-through; text-decoration-color: var(--bad); opacity: .65; }
+  .hide-strike .strike, .hide-strike .all-struck { display: none; }
+  .hide-strike .field.cut { background: none; padding: 0; }
+  /* En blok, hvis egen åbning er overstreget, men som har indhold, der ikke er, "pakkes ud", når
+     overstreget tekst skjules: overskrift, lukning og ramme forsvinder (også fra indekset), og
+     indholdet står, som om blokken ikke fandtes */
+  .hide-strike details.block.head-struck:not(.all-struck) { margin: 0; border-left: 0; }
+  .hide-strike details.block.head-struck:not(.all-struck) > summary,
+  .hide-strike details.block.head-struck:not(.all-struck) > .closer,
+  .hide-strike .index li.head-struck { display: none; }
+  .hide-strike details.block.head-struck:not(.all-struck) > .body { padding: 0; }
+</style>
+</head>
+<body class="bg-body-tertiary">
+
+<nav class="navbar sticky-top bg-body border-bottom shadow-sm">
+  <div class="container-fluid page gap-2">
+    <span class="navbar-brand mb-0 h1"><span class="brand-mark">&lt;&lt;</span> Regelstruktur <span class="brand-mark">&gt;&gt;</span></span>
+    {% if name %}<span class="badge rounded-pill text-bg-primary fw-medium filename" title="{{ name }}">{{ name }}</span>{% endif %}
+    <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+      <span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal">{{ stats.blocks }} blokke</span>
+      <span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal">dybde {{ stats.depth }}</span>
+      {% if stats.struck %}<span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal">{{ stats.struck }} overstregninger</span>{% endif %}
+      {% if stats.unclosed %}<span class="badge rounded-pill text-bg-danger">{{ stats.unclosed }} uden lukning</span>{% endif %}
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary" data-open="1">Fold alt ud</button>
+        <button type="button" class="btn btn-outline-secondary" data-open="">Fold alt sammen</button>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="strike" aria-pressed="false" {{ 'disabled' if not stats.struck }}
+              title="{{ 'Vis eller skjul tekst, der er overstreget i Word-filen' if stats.struck else 'Der er ingen overstreget tekst' }}">Skjul overstreget tekst</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid page py-3">
+  <form method="post" enctype="multipart/form-data" class="card shadow-sm mb-3">
+    <div class="card-body">
+      <label class="dropzone{{ ' compact' if tree }}" for="file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6"/><path d="m9.5 13.5 2.5-2.5 2.5 2.5"/>
+        </svg>
+        <span><strong>Træk en Word-fil hertil</strong> eller klik for at vælge</span>
+        <span class="small">.docx – kan slippes hvor som helst i vinduet</span>
+        <input type="file" name="file" id="file" accept=".docx,.txt" class="visually-hidden">
+      </label>
+      {% if error %}<div class="alert alert-danger mt-3 mb-0" role="alert">{{ error }}</div>{% endif %}
+      <details class="paste mt-2" {{ 'open' if text }}>
+        <summary>… eller indsæt tekst</summary>
+        <textarea name="text" id="text" spellcheck="false" class="form-control mt-2"
+                  placeholder="Indsæt en regel-streng, fx <<K970a <<Hvis … >>K970a>>">{{ text }}</textarea>
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-primary btn-sm" type="submit">Vis struktur</button>
+          <button class="btn btn-outline-secondary btn-sm" type="button" id="clear">Ryd</button>
+        </div>
+      </details>
+    </div>
+  </form>
+
+  {% macro render(items, depth) %}
+    {% for item in items %}
+      {% if item.type == "text" %}
+        {% for line in item.lines %}<div class="line{{ ' all-struck' if line.struck }}">{{ line.html }}</div>{% endfor %}
+      {% elif item.type == "table" %}
+        <div class="table-wrap{{ ' all-struck' if item.struck }}">
+          <table>
+            {% for row in item.rows %}
+            <tr{% if row.struck %} class="all-struck"{% endif %}>{% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </table>
+        </div>
+      {% elif item.type == "heading" %}
+        <div class="heading lv{{ item.level }}{{ ' all-struck' if item.struck }}" id="{{ item.id }}"
+             data-level="{{ item.level }}" role="heading" aria-level="{{ item.level + 1 }}">{{ item.html }}</div>
+      {% else %}
+        <details class="block d{{ depth % 5 }}{{ ' all-struck' if item.struck }}{{ ' head-struck' if item.opener_struck }}" {% if item.id %}id="{{ item.id }}"{% endif %} open>
+          <summary>
+            {% if item.closer is none %}<span class="missing-tag" title="Blokken bliver aldrig lukket">MANGLER LUKNING</span>{% endif %}
+            <span class="label">{% if item.opener_struck %}<s class="strike">{{ item.opener }}</s>{% else %}{{ item.opener }}{% endif %}{{ item.label }}</span>
+            {% for clause in item.clauses %}
+              <span class="clause{{ ' more' if not loop.first }}">{{ clause }}</span>
+            {% endfor %}
+          </summary>
+          <div class="body">{{ render(item.children, depth + 1) }}</div>
+          {% if item.closer is none %}
+            <div class="closer missing">{{ item.name }} mangler lukning</div>
+          {% else %}
+            <div class="closer{{ ' all-struck' if item.closer_struck }}">{{ item.closer }}</div>
+          {% endif %}
+        </details>
+      {% endif %}
+    {% endfor %}
+  {% endmacro %}
+
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button type="button" class="nav-link active" role="tab" data-tab="structure" aria-selected="true">Struktur</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button type="button" class="nav-link" role="tab" data-tab="overview" aria-selected="false">Regler og datapunkter
+        <span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal">{{ overview.rules.rows|length }} + {{ overview.data.rows|length }}</span></button>
+    </li>
+  </ul>
+
+  <div id="tab-overview" class="overview" role="tabpanel" hidden>
+    <form method="post" action="{{ url_for('export') }}" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <input type="search" id="overview-filter" class="form-control form-control-sm" style="max-width: 20rem"
+             placeholder="Søg i regler og datapunkter …" aria-label="Søg i regler og datapunkter">
+      <input type="hidden" name="name" value="{{ name }}">
+      <input type="hidden" name="overview" value='{{ overview|tojson }}'>
+      <span class="ms-auto text-body-secondary small">Eksportér:</span>
+      <button class="btn btn-sm btn-primary" name="format" value="xlsx" title="Én fil med et ark til regler og et til datapunkter">Excel (.xlsx)</button>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" name="format" value="csv-rules">Regler (.csv)</button>
+        <button class="btn btn-outline-secondary" name="format" value="csv-data">Datapunkter (.csv)</button>
+      </div>
+    </form>
+
+    {% if catalog_error %}<div class="alert alert-warning py-2 small">{{ catalog_error }}</div>{% endif %}
+    {% if catalog %}
+    <p class="small text-body-secondary mb-3">Katalog: <code>{{ catalog.path }}</code> ({{ catalog|length }} koder).
+      Kolonnen „{{ catalog_header }}“ er grøn, hvis koden findes i kataloget, og rød, hvis den ikke gør.</p>
+    {% elif not catalog_error %}
+    <p class="small text-body-secondary mb-3">Intet katalog angivet. Kopiér <code>config.example.ini</code> til
+      <code>config.ini</code> og skriv stien til katalogfilen (.edn) dér for at se, om reglerne og datapunkterne findes i kataloget.</p>
+    {% endif %}
+
+    {% macro table(title, kind, data) %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-transparent fw-semibold">{{ title }}
+        <span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal">{{ data.rows|length }}</span></div>
+      {% if data.rows %}
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr>{% for header in data.headers %}<th scope="col"{% if data.rows[0][loop.index0] is number %} class="num"{% endif %}>{{ header }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in data.rows %}
+          {% set count = data.headers.index("Forekomster") %}
+          <tr{% if row[count] == row[count + 1] %} class="all-struck"{% endif %}>
+            {% for cell in row %}
+              {% if loop.first %}<td class="code"><span class="{{ kind }}-code">{{ cell }}</span></td>
+              {% elif data.headers[loop.index0] == catalog_header %}<td class="num"><span class="badge {{ 'text-bg-success' if cell == 'Ja' else 'text-bg-danger' }}"
+                  title="{{ 'Findes i kataloget' if cell == 'Ja' else 'Findes ikke i kataloget' }}">{{ cell }}</span></td>
+              {% else %}<td{% if cell is number %} class="num"{% endif %}>{{ cell }}</td>{% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="card-body text-body-secondary">Ingen fundet.</div>
+      {% endif %}
+    </div>
+    {% endmacro %}
+    {{ table("Regler", "rule", overview.rules) }}
+    {{ table("Datapunkter", "data", overview.data) }}
+  </div>
+
+  <div id="tab-structure" role="tabpanel" class="layout{{ ' no-index' if not index }}">
+    {% if index %}
+    <nav class="index card shadow-sm" aria-label="Afsnit">
+      <div class="card-header bg-transparent">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <span class="fw-semibold fs-6">Afsnit</span>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary py-0" data-all="1">Vis alle</button>
+            <button type="button" class="btn btn-outline-secondary py-0" data-all="">Skjul alle</button>
+          </div>
+        </div>
+        <input type="search" id="filter" class="form-control form-control-sm mt-2" placeholder="Søg i afsnit …" aria-label="Søg i afsnit">
+      </div>
+      <div class="card-body p-2">
+        <ul class="list-unstyled mb-0">
+          {% for entry in index %}
+          <li class="{{ entry.kind }}{{ ' all-struck' if entry.struck }}{{ ' head-struck' if entry.head_struck }}" style="--indent: {{ entry.indent }}">
+            <input type="checkbox" class="form-check-input" checked data-target="{{ entry.id }}" aria-label="Vis {{ entry.title }}">
+            <a href="#{{ entry.id }}" title="{{ entry.title }}">{{ entry.html }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="text-body-secondary px-1 py-2" id="no-match" hidden>Ingen afsnit matcher.</div>
+      </div>
+      <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" tabindex="0"
+           title="Træk for at ændre bredden (dobbeltklik nulstiller)"></div>
+    </nav>
+    {% endif %}
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent legend">
+        <span><span class="field data">&lt;&lt;10F datapunkt&gt;&gt;</span></span>
+        <span><span class="field">&lt;&lt;K1 … K1&gt;&gt;</span> blok på én linje</span>
+        <span><span class="rule">(R123=TRUE)</span> regelhenvisning</span>
+        <span><span class="ref">[AV189.1]</span> kommentarmærke</span>
+        <span><span class="op">ELLER</span> / <span class="op">OG</span></span>
+        <span><s class="strike">overstreget</s></span>
+      </div>
+      <div class="card-body tree">
+        {% if tree %}{{ render(tree, 0) }}{% else %}<span class="text-body-secondary">Ingen tekst at vise.</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="dropdown-menu shadow" id="context" role="menu">
+  <button type="button" class="dropdown-item" id="to-index" role="menuitem">Vis i indeks</button>
+  <button type="button" class="dropdown-item" id="solo" role="menuitem">Vis kun dette afsnit</button>
+  <button type="button" class="dropdown-item" id="unsolo" role="menuitem">Vis alle afsnit</button>
+</div>
+
+<script>
+  document.querySelectorAll("[data-open]").forEach(btn => btn.addEventListener("click", () => {
+    document.querySelectorAll("details.block").forEach(d => d.open = Boolean(btn.dataset.open));
+  }));
+  document.getElementById("clear").addEventListener("click", () => {
+    const box = document.getElementById("text");
+    document.getElementById("file").value = "";
+    box.value = "";
+    box.focus();
+  });
+
+  // En valgt fil vises med det samme, og en fil kan slippes hvor som helst i vinduet
+  const fileInput = document.getElementById("file");
+  fileInput.addEventListener("change", () => { if (fileInput.files.length) fileInput.form.requestSubmit(); });
+  const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+  let dragDepth = 0;  // dragenter/dragleave fyrer for hvert element, musen passerer
+  function dragging(delta) {
+    dragDepth = Math.max(0, delta ? dragDepth + delta : 0);
+    document.body.classList.toggle("dragging", dragDepth > 0);
+  }
+  addEventListener("dragenter", e => { if (hasFiles(e)) { e.preventDefault(); dragging(1); } });
+  addEventListener("dragleave", e => { if (hasFiles(e)) dragging(-1); });
+  addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+  addEventListener("drop", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragging(0);
+    const picked = new DataTransfer();
+    picked.items.add(e.dataTransfer.files[0]);
+    fileInput.files = picked.files;
+    fileInput.form.requestSubmit();
+  });
+
+  // Overstreget tekst til/fra (valget huskes i browseren)
+  const strikeBtn = document.getElementById("strike");
+  function hideStrike(hide) {
+    document.body.classList.toggle("hide-strike", hide);
+    strikeBtn.classList.toggle("active", hide);
+    strikeBtn.setAttribute("aria-pressed", hide);
+    strikeBtn.textContent = hide ? "Vis overstreget tekst" : "Skjul overstreget tekst";
+    try { localStorage.setItem("hideStrike", hide ? "1" : ""); } catch (e) {}
+    // Udpakkede blokke har ingen overskrift at klikke på, så de skal være foldet ud
+    if (hide) document.querySelectorAll("details.block.head-struck:not(.all-struck)").forEach(d => d.open = true);
+  }
+  strikeBtn.addEventListener("click", () => hideStrike(!document.body.classList.contains("hide-strike")));
+  try { if (localStorage.getItem("hideStrike") && !strikeBtn.disabled) hideStrike(true); } catch (e) {}
+
+  // Indeks: tænd og sluk for afsnit. En overskrift dækker alt frem til næste overskrift på samme
+  // eller højere niveau; en blok dækker kun sig selv.
+  const boxes = new Map();
+  document.querySelectorAll(".index input[data-target]").forEach(box => boxes.set(box.dataset.target, box));
+
+  function section(el) {
+    const parts = [el];
+    if (!el.classList.contains("heading")) return parts;
+    for (let n = el.nextElementSibling; n; n = n.nextElementSibling) {
+      if (n.classList.contains("heading") && Number(n.dataset.level) <= Number(el.dataset.level)) break;
+      parts.push(n);
+    }
+    return parts;
+  }
+  function mark(el, on) {
+    el.hidden = !on;
+    const box = boxes.get(el.id);
+    if (box) { box.checked = on; box.closest("li").classList.toggle("off", !on); }
+  }
+  function show(el, on) {
+    for (const part of section(el)) {
+      mark(part, on);
+      part.querySelectorAll("[id]").forEach(inner => mark(inner, on));
+      if (on) part.querySelectorAll("[hidden]").forEach(inner => inner.hidden = false);  // løs tekst skjult af "Vis kun"
+    }
+    // Et afsnit, der tændes inde i en slukket blok, kræver at blokken også vises
+    if (on) for (let p = el.parentElement.closest("[hidden]"); p; p = p.parentElement.closest("[hidden]")) mark(p, true);
+  }
+  boxes.forEach((box, id) => box.addEventListener("change", () => show(document.getElementById(id), box.checked)));
+  function showAll(on) {
+    boxes.forEach((box, id) => {
+      const el = document.getElementById(id);
+      section(el).forEach(part => { if (!part.id) part.hidden = !on; });  // løs tekst under overskrifter
+      mark(el, on);
+    });
+    if (on) document.querySelectorAll(".tree [hidden]").forEach(el => el.hidden = false);
+  }
+  document.querySelectorAll("[data-all]").forEach(btn => btn.addEventListener("click", () => showAll(Boolean(btn.dataset.all))));
+
+  // "Solo": vis kun ét afsnit. Blokkene uden om det vises som tomme rammer, så man kan se, hvor det hører til.
+  function solo(el) {
+    showAll(false);
+    show(el, true);
+    const keep = new Set(section(el));
+    for (let node = el; node; node = node.parentElement.closest(".tree details")) {
+      for (const sibling of node.parentElement.children) {
+        if (!sibling.id && !keep.has(sibling) && !sibling.matches("summary")) sibling.hidden = true;
+      }
+    }
+  }
+
+  // Højreklik i træet → "Vis i indeks": indekset ruller hen til afsnittet, som blinker kort
+  // (plus "Vis kun dette afsnit" / "Vis alle afsnit", som også findes ved højreklik i indekset).
+  // Løs tekst hører til den blok, den står i, ellers til overskriften over den.
+  const context = document.getElementById("context");
+  let contextId = "";
+  function indexed(node) {
+    const el = node.closest(".tree [id]");
+    if (el) return el;
+    let n = node.closest(".tree > *");
+    while (n && !n.classList.contains("heading")) n = n.previousElementSibling;
+    return n;
+  }
+  function closeContext() { context.classList.remove("show"); }
+  function openContext(e, el, fromIndex) {
+    if (!el || e.shiftKey) return closeContext();  // Shift+højreklik giver browserens egen menu
+    e.preventDefault();
+    contextId = el.id;
+    document.getElementById("to-index").hidden = fromIndex;
+    context.classList.add("show");
+    context.style.left = Math.min(e.clientX, innerWidth - context.offsetWidth - 8) + "px";
+    context.style.top = Math.min(e.clientY, innerHeight - context.offsetHeight - 8) + "px";
+  }
+  document.querySelector(".tree").addEventListener("contextmenu", e => openContext(e, boxes.size && indexed(e.target), false));
+  // Højreklik på en linje i indekset: "Vis kun dette afsnit" (som solo på en kanal) og "Vis alle afsnit"
+  document.querySelectorAll(".index li").forEach(li => li.addEventListener("contextmenu", e => {
+    openContext(e, document.getElementById(li.querySelector("input").dataset.target), true);
+  }));
+  document.getElementById("solo").addEventListener("click", () => { closeContext(); solo(document.getElementById(contextId)); });
+  document.getElementById("unsolo").addEventListener("click", () => { closeContext(); showAll(true); });
+  document.getElementById("to-index").addEventListener("click", () => {
+    closeContext();
+    const li = boxes.get(contextId).closest("li");
+    if (li.hidden) { filter.value = ""; filter.dispatchEvent(new Event("input")); }  // søgningen skjulte linjen
+    const flash = () => {
+      li.classList.remove("flash");
+      void li.offsetWidth;  // genstart animationen
+      li.classList.add("flash");
+    };
+    // Rul kun selve indekset (ikke siden), så linjen står midt i det, og blink når den er nået frem
+    const list = li.closest(".card-body");
+    const box = list.getBoundingClientRect(), row = li.getBoundingClientRect();
+    if (box.bottom < 0 || box.top > innerHeight) li.scrollIntoView({block: "center"});  // smal skærm: indekset er rullet ud af syne
+    const top = Math.max(0, Math.min(list.scrollHeight - list.clientHeight,
+                                     list.scrollTop + row.top - box.top - (list.clientHeight - row.height) / 2));
+    if (Math.abs(top - list.scrollTop) < 2) return flash();
+    let arrived = false;
+    const arrive = () => { if (!arrived) { arrived = true; flash(); } };
+    list.addEventListener("scrollend", arrive, {once: true});
+    setTimeout(arrive, 900);  // browsere uden scrollend
+    list.scrollTo({top, behavior: "smooth"});
+  });
+  addEventListener("click", e => { if (!context.contains(e.target)) closeContext(); });
+  addEventListener("keydown", e => { if (e.key === "Escape") closeContext(); });
+  addEventListener("scroll", closeContext, true);
+  addEventListener("resize", closeContext);
+
+  // Faner: Struktur / Regler og datapunkter
+  const tabs = document.querySelectorAll("[data-tab]");
+  tabs.forEach(tab => tab.addEventListener("click", () => tabs.forEach(other => {
+    const on = other === tab;
+    other.classList.toggle("active", on);
+    other.setAttribute("aria-selected", on);
+    document.getElementById("tab-" + other.dataset.tab).hidden = !on;
+  })));
+  const overviewFilter = document.getElementById("overview-filter");
+  overviewFilter.addEventListener("input", () => {
+    const query = overviewFilter.value.trim().toLowerCase();
+    document.querySelectorAll(".overview tbody tr").forEach(row => {
+      row.hidden = !row.textContent.toLowerCase().includes(query);
+    });
+  });
+  overviewFilter.addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });  // Enter må ikke eksportere
+
+  // Klik i indekset finder altid afsnittet: det tændes, de ydre blokke foldes ud, og det blinker kort
+  document.querySelectorAll(".index a").forEach(link => link.addEventListener("click", e => {
+    const el = document.getElementById(link.hash.slice(1));
+    if (!el) return;
+    e.preventDefault();
+    if (el.closest("[hidden]")) show(el, true);
+    for (let d = el.parentElement.closest("details"); d; d = d.parentElement.closest("details")) d.open = true;
+    el.scrollIntoView({block: "start"});
+    const target = el.matches("details") ? el.querySelector("summary") : el;
+    target.classList.remove("flash");
+    void target.offsetWidth;  // genstart animationen
+    target.classList.add("flash");
+  }));
+
+  // Indeksets bredde: træk i håndtaget, piletaster når det har fokus, dobbeltklik nulstiller
+  const resizer = document.getElementById("resizer");
+  if (resizer) {
+    const layout = document.querySelector(".layout"), nav = resizer.parentElement;
+    const setWidth = (px, save) => {
+      const width = Math.round(Math.min(Math.max(px, 180), innerWidth * .7));
+      layout.style.setProperty("--index-width", width + "px");
+      if (save) try { localStorage.setItem("indexWidth", width); } catch (e) {}
+    };
+    try { const saved = Number(localStorage.getItem("indexWidth")); if (saved) setWidth(saved); } catch (e) {}
+    resizer.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      resizer.setPointerCapture(e.pointerId);
+      document.body.classList.add("resizing");
+    });
+    resizer.addEventListener("pointermove", e => {
+      if (resizer.hasPointerCapture(e.pointerId)) setWidth(e.clientX - nav.getBoundingClientRect().left);
+    });
+    const done = e => {
+      if (!document.body.classList.contains("resizing")) return;
+      document.body.classList.remove("resizing");
+      setWidth(nav.offsetWidth, true);
+    };
+    resizer.addEventListener("pointerup", done);
+    resizer.addEventListener("pointercancel", done);
+    resizer.addEventListener("keydown", e => {
+      const step = {ArrowLeft: -24, ArrowRight: 24}[e.key];
+      if (step) { e.preventDefault(); setWidth(nav.offsetWidth + step, true); }
+    });
+    resizer.addEventListener("dblclick", () => {
+      layout.style.removeProperty("--index-width");
+      try { localStorage.removeItem("indexWidth"); } catch (e) {}
+    });
+  }
+
+  // Søgefeltet filtrerer kun listen i indekset, ikke selve træet
+  const filter = document.getElementById("filter");
+  if (filter) filter.addEventListener("input", () => {
+    const query = filter.value.trim().toLowerCase();
+    let hits = 0;
+    document.querySelectorAll(".index li").forEach(li => {
+      li.hidden = !li.textContent.toLowerCase().includes(query);
+      hits += !li.hidden;
+    });
+    document.getElementById("no-match").hidden = hits > 0;
+  });
+</script>
+</body>
+</html>

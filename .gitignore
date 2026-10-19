@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Word-filer holdes ude af Git (rigtige skabeloner må ikke i repoet); kun den opdigtede testfil er med
+*.docx
+!test_document.docx
+
+# Lokale indstillinger (stien til kataloget er forskellig fra maskine til maskine) og selve kataloget
+config.ini
+*.edn
