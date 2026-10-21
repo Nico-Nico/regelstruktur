@@ -15,16 +15,17 @@ from pathlib import Path
 from flask import Flask, abort, render_template, request, send_file
 from markupsafe import Markup, escape
 
-from catalog import CATALOG_HEADER, add_catalog_column, configured_catalog
+from catalog import CATALOG_HEADER, DESCRIPTION_HEADER, add_catalog_column, configured_catalog
 from docx_reader import read_docx
 from overview import collect, to_csv, to_xlsx
-from rule_parser import HILITE, MARKS, STRIKE_OFF, STRIKE_ON, STRUCK, parse, to_tree
+from rule_parser import DATA_CODE, HILITE, MARKS, STRIKE_OFF, STRIKE_ON, STRUCK, parse, to_tree
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200_000_000  # Word-skabeloner med billeder kan være store
 app.config["MAX_FORM_MEMORY_SIZE"] = 50_000_000  # indsat tekst og eksportdata sendes som formularfelter
 
 EXAMPLE = Path(__file__).with_name("test_document.docx")  # opdigtet eksempel
+DATA_START = re.compile(rf"\s*{DATA_CODE}(?![^\s<>])")  # det, der står efter << i et datapunkt
 PARTS = re.compile(f"{HILITE.pattern}|{MARKS.pattern}")
 STRIKE_OPEN, STRIKE_CLOSE = Markup('<s class="strike">'), Markup("</s>")
 
@@ -63,7 +64,7 @@ class Highlighter:
             if tok.endswith("<<"):
                 depth += 1
                 cls = "field"
-                if MARKS.sub("", text[pos:pos + 4])[:1].isdigit():  # datapunkt, fx <<10F vurderingsår>>
+                if DATA_START.match(MARKS.sub("", text[pos:pos + 60])):  # datapunkt, fx <<10F …>> eller <<VM127 …>>
                     cls += " data"
                 if tok.startswith(STRUCK):
                     cls += " cut"
@@ -200,13 +201,21 @@ def index():
     tree = to_tree(parse(text).children)
     counts = stats(tree) | {"struck": text.count(STRIKE_ON)}
     overview = collect(tree)  # før prepare, som laver teksterne om til HTML
+    blocks = overview.pop("blocks")  # blokkene i kolonnen "Blokke"; skal ikke med i eksporten
     catalog, catalog_error = configured_catalog()
+    details = {}  # kode → alle oplysninger fra kataloget, til vinduet over "Beskrivelse - katalog"
     if catalog:
-        add_catalog_column(overview["rules"], catalog)
-        add_catalog_column(overview["data"], catalog)
+        for table in (overview["rules"], overview["data"]):
+            add_catalog_column(table, catalog)
+            details.update({row[0]: catalog.fields(row[0]) for row in table["rows"] if row[0] in catalog})
+    index = prepare(tree)  # giver hver blok et id i træet, som vinduet over "Blokke" kopierer fra
+    blocks = {bid: {"name": block["name"], "line": block["line"], "target": block["item"]["id"],
+                    "struck": bool(block["item"]["struck"])}  # helt overstreget blok
+              for bid, block in blocks.items()}
     return render_template("index.html", text=pasted, name=name, error=error,
-                           tree=tree, index=prepare(tree), stats=counts, overview=overview,
-                           catalog=catalog, catalog_error=catalog_error, catalog_header=CATALOG_HEADER)
+                           tree=tree, index=index, stats=counts, overview=overview,
+                           catalog=catalog, catalog_error=catalog_error, catalog_details=details, blocks=blocks,
+                           catalog_header=CATALOG_HEADER, description_header=DESCRIPTION_HEADER)
 
 
 XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

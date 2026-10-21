@@ -20,7 +20,10 @@
     --data: #4a3b00; --data-bg: #ffe866; --field: #0b7285; --field-bg: #e3f4f7; --rule: #9a5b00; --rule-bg: #fdf1d8; --op: #a21caf;
     --c0: #2563eb; --c1: #15803d; --c2: #9333ea; --c3: #c2410c; --c4: #0e7490; --bad: #b91c1c;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --top: 4.25rem;  /* plads til den faste bjælke øverst */
+    /* Højden på den faste bjælke og fanerne øverst; måles igen af scriptet, når siden vises */
+    --nav-h: 3.6rem; --tabs-h: 3rem;
+    --stack: calc(var(--nav-h) + var(--tabs-h));  /* alt, der står fast øverst */
+    --top: calc(var(--stack) + .75rem);           /* lidt luft under det */
   }
   [data-bs-theme="dark"] {
     --data: #ffe680; --data-bg: #5e4d00; --field: #66d9e8; --field-bg: #12343b; --rule: #f0b860; --rule-bg: #3a2c12; --op: #e879f9;
@@ -79,13 +82,65 @@
   .index li.off a { color: var(--bs-secondary-color); opacity: .6; }
   .index li.all-struck a { text-decoration: line-through; }
   .index a span { padding: 0; background: none; color: inherit; font-weight: inherit; font-size: inherit; }
-  .flash { animation: flash 1.8s ease-out; }
+  .flash, .overview tr.flash > td { animation: flash 1.8s ease-out; }
+  .overview tr.flash { animation: none; }
+  /* Regler og datapunkter i fuldteksten fører til deres række i "Regler og datapunkter" */
+  .tree .linked { cursor: pointer; }
+  .tree .linked:hover { text-decoration: underline; text-underline-offset: 2px; }
   @keyframes flash { from, 40% { background: var(--bs-warning-bg-subtle); box-shadow: 0 0 0 2px var(--bs-warning); } }
+  /* Fanerne bliver hængende lige under bjælken øverst, så man altid kan skifte */
+  #tabs { position: sticky; top: var(--nav-h); z-index: 1010; padding-top: .5rem; background: var(--bs-tertiary-bg); }
   .nav-tabs .nav-link { color: var(--bs-secondary-color); }
   .nav-tabs .nav-link.active { color: var(--bs-body-color); font-weight: 600; }
   .overview table { font-size: .8125rem; }
-  .overview th { position: sticky; top: var(--top); z-index: 1; background: var(--bs-body-bg); white-space: nowrap;
+  .overview th { position: sticky; top: var(--stack); z-index: 1; background: var(--bs-body-bg); white-space: nowrap;
                  box-shadow: inset 0 -1px var(--bs-border-color); }
+  .overview td.description { min-width: 16rem; color: var(--bs-secondary-color); }
+  /* Detaljepanelet i nederste halvdel af skærmen på fanen "Regler og datapunkter" */
+  :root { --detail-h: 45vh; }  /* panelets højde; kan trækkes i den øverste kant */
+  #detail { position: fixed; left: 0; right: 0; bottom: 0; height: var(--detail-h); z-index: 1005; display: flex; flex-direction: column;
+            border-top: 1px solid var(--bs-border-color); background: var(--bs-body-bg); box-shadow: 0 -.25rem 1rem rgba(0, 0, 0, .08); }
+  body.with-detail { padding-bottom: var(--detail-h); }  /* så de nederste rækker kan rulles fri af panelet */
+  #detail-resizer { position: absolute; left: 0; right: 0; top: -5px; height: 10px; cursor: row-resize; touch-action: none; z-index: 1; }
+  #detail-resizer::after { content: ""; position: absolute; left: calc(50% - 2rem); width: 4rem; top: 3px; height: 4px; border-radius: 2px;
+                           background: var(--bs-border-color); }
+  #detail-resizer:hover::after, .resizing-detail #detail-resizer::after { background: var(--bs-primary); }
+  .resizing-detail { cursor: row-resize; user-select: none; }
+  #detail .detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; padding: .5rem 1rem;
+                         border-bottom: 1px solid var(--bs-border-color); font-size: .875rem; }
+  #detail.pinned .detail-head { background: var(--bs-primary-bg-subtle); }
+  /* Tre felter: blokken | de to beskrivelser (delt af en vandret streg) | alt fra kataloget */
+  #detail .detail-body { flex: 1; min-height: 0; display: grid;
+                         grid-template-columns: minmax(0, 5fr) minmax(14rem, 3fr) minmax(14rem, 3fr); }
+  #detail .detail-body > * { min-height: 0; border-left: 1px solid var(--bs-border-color); }
+  #detail .detail-body > :first-child { border-left: 0; }
+  #detail .detail-block { overflow: auto; padding: .75rem 1rem; font-size: 12px; }
+  #detail .detail-texts { display: grid; grid-template-rows: 1fr 1fr; }
+  #detail .detail-texts > section { min-height: 0; overflow: auto; padding: .75rem 1rem; font-size: .875rem; }
+  #detail .detail-texts > section + section { border-top: 1px solid var(--bs-border-color); }
+  #detail .detail-fields { overflow: auto; padding: .75rem 1rem; }
+  #detail h3 { margin: 0 0 .25rem; color: var(--bs-secondary-color); font-size: .7rem; font-weight: 600;
+               letter-spacing: .05em; text-transform: uppercase; }
+  #detail .detail-texts p { margin: 0; white-space: pre-wrap; }
+  #detail .empty { color: var(--bs-secondary-color); font-style: italic; }
+  #detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem .9rem; margin: .5rem 0 0; }
+  #detail dt { font: 600 .75rem/1.6 var(--mono); color: var(--c2); }
+  #detail dd { margin: 0; font: .75rem/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  @media (max-width: 900px) {
+    #detail .detail-body { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+    #detail .detail-body > * { border-left: 0; border-top: 1px solid var(--bs-border-color); }
+  }
+  .cell-line.active { background: var(--bs-primary-bg-subtle); }
+  .overview td.blocks { width: 24rem; max-width: 24rem; padding-block: 0; }
+  /* Kolonnerne "Blokke" og "Beskrivelse - skabelon"/"Tekst" har én linje pr. blok, der flugter på tværs */
+  .cell-line { padding: .25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: .75rem/1.5 var(--mono); }
+  .cell-line + .cell-line { border-top: 1px solid var(--bs-border-color); }
+  .overview td.lines { width: 22rem; max-width: 22rem; }
+  .overview td.lines .cell-line { font-family: var(--bs-body-font-family); }
+  .cell-line.outside { color: var(--bs-secondary-color); font-style: italic; }
+  .overview td.blocks .cell-line { cursor: pointer; }
+  .block-ref:hover { color: var(--bs-primary); }
+  .block-ref.all-struck { text-decoration: line-through; text-decoration-color: var(--bad); opacity: .65; }
   .overview td.code { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
   .overview .num { width: 1%; padding-inline: 1rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .overview td:first-child, .overview th:first-child { padding-left: 1rem; }
@@ -140,6 +195,8 @@
   .hide-strike .index li.head-struck { display: none; }
   .hide-strike details.block.head-struck:not(.all-struck) > .body { padding: 0; }
 </style>
+<!-- Farveskemaet "Sage and Sand"; efter Bootstrap og den egen stil ovenfor, så det vinder -->
+<link rel="stylesheet" href="{{ url_for('static', filename='custom.css') }}">
 </head>
 <body class="bg-body-tertiary">
 
@@ -221,7 +278,8 @@
     {% endfor %}
   {% endmacro %}
 
-  <ul class="nav nav-tabs mb-3" role="tablist">
+  <div id="tabs-anchor"></div>
+  <ul class="nav nav-tabs mb-3" id="tabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button type="button" class="nav-link active" role="tab" data-tab="structure" aria-selected="true">Struktur</button>
     </li>
@@ -248,7 +306,7 @@
     {% if catalog_error %}<div class="alert alert-warning py-2 small">{{ catalog_error }}</div>{% endif %}
     {% if catalog %}
     <p class="small text-body-secondary mb-3">Katalog: <code>{{ catalog.path }}</code> ({{ catalog|length }} koder).
-      Kolonnen „{{ catalog_header }}“ er grøn, hvis koden findes i kataloget, og rød, hvis den ikke gør.</p>
+      Kolonnen „{{ catalog_header }}“ er grøn, hvis koden findes i kataloget, og sandfarvet, hvis den ikke gør.</p>
     {% elif not catalog_error %}
     <p class="small text-body-secondary mb-3">Intet katalog angivet. Kopiér <code>config.example.ini</code> til
       <code>config.ini</code> og skriv stien til katalogfilen (.edn) dér for at se, om reglerne og datapunkterne findes i kataloget.</p>
@@ -263,13 +321,17 @@
         <thead><tr>{% for header in data.headers %}<th scope="col"{% if data.rows[0][loop.index0] is number %} class="num"{% endif %}>{{ header }}</th>{% endfor %}</tr></thead>
         <tbody>
           {% for row in data.rows %}
-          {% set count = data.headers.index("Forekomster") %}
-          <tr{% if row[count] == row[count + 1] %} class="all-struck"{% endif %}>
+          {% set row_blocks = data.blocks[loop.index0] %}
+          {% set row_lines = data.lines[loop.index0] %}
+          <tr{% if data.struck[loop.index0] %} class="all-struck"{% endif %} data-kind="{{ kind }}" data-code="{{ row[0] }}">
             {% for cell in row %}
               {% if loop.first %}<td class="code"><span class="{{ kind }}-code">{{ cell }}</span></td>
               {% elif data.headers[loop.index0] == catalog_header %}<td class="num"><span class="badge {{ 'text-bg-success' if cell == 'Ja' else 'text-bg-danger' }}"
                   title="{{ 'Findes i kataloget' if cell == 'Ja' else 'Findes ikke i kataloget' }}">{{ cell }}</span></td>
-              {% else %}<td{% if cell is number %} class="num"{% endif %}>{{ cell }}</td>{% endif %}
+              {% elif data.headers[loop.index0] == "Blokke" %}<td class="blocks">{% for bid in row_blocks %}{% if bid %}<div class="cell-line block-ref{{ ' all-struck' if blocks[bid].struck }}" data-target="{{ blocks[bid].target }}" data-name="{{ blocks[bid].name }}">{{ blocks[bid].line }}</div>{% else %}<div class="cell-line outside">(uden for blokke)</div>{% endif %}{% endfor %}</td>
+              {% elif data.headers[loop.index0] in ("Beskrivelse - skabelon", "Beskrivelse - skabelon") %}<td class="blocks lines">{% for bid in row_blocks %}<div class="cell-line{{ ' all-struck' if bid and blocks[bid].struck }}" title="{{ row_lines[loop.index0] }}">{{ row_lines[loop.index0] or "–" }}</div>{% endfor %}</td>
+              {% elif data.headers[loop.index0] == description_header and row[0] in catalog_details %}<td class="description from-catalog" data-code="{{ row[0] }}">{{ cell }}</td>
+              {% else %}<td{% if cell is number %} class="num"{% elif data.headers[loop.index0].startswith("Beskrivelse") %} class="description"{% endif %}>{{ cell }}</td>{% endif %}
             {% endfor %}
           </tr>
           {% endfor %}
@@ -328,6 +390,28 @@
     </div>
   </div>
 </main>
+
+<section id="detail" aria-live="polite" hidden>
+  <div id="detail-resizer" role="separator" aria-orientation="horizontal" tabindex="0"
+       title="Træk for at ændre højden (dobbeltklik nulstiller)"></div>
+  <div class="detail-head">
+    <span id="detail-title" class="fw-semibold">Ingen blok valgt</span>
+    <span id="detail-hint" class="ms-auto small text-body-secondary">Hold musen over en blok i kolonnen „Blokke“ – klik for at fastholde den</span>
+  </div>
+  <div class="detail-body">
+    <div class="detail-block tree" id="detail-block"><span class="empty">Blokken vises her.</span></div>
+    <div class="detail-texts">
+      <section><h3 id="detail-template-head">Beskrivelse - skabelon</h3><p id="detail-template" class="empty">–</p></section>
+      <section><h3>Beskrivelse - katalog</h3><p id="detail-catalog" class="empty">–</p></section>
+    </div>
+    <div class="detail-fields">
+      <h3>Alle oplysninger i kataloget</h3>
+      <p id="detail-fields-none" class="empty small mb-0">–</p>
+      <dl id="detail-fields"></dl>
+    </div>
+  </div>
+</section>
+<script type="application/json" id="catalog-details">{{ catalog_details|tojson }}</script>
 
 <div class="dropdown-menu shadow" id="context" role="menu">
   <button type="button" class="dropdown-item" id="to-index" role="menuitem">Vis i indeks</button>
@@ -489,14 +573,140 @@
   addEventListener("scroll", closeContext, true);
   addEventListener("resize", closeContext);
 
-  // Faner: Struktur / Regler og datapunkter
+  // Detaljepanel på "Regler og datapunkter": hold musen over en blok i kolonnen "Blokke" (eller dens
+  // beskrivelse), så viser den nederste halvdel af skærmen blokken, beskrivelsen fra skabelonen og
+  // beskrivelsen fra kataloget. Et klik fastholder blokken, så man kan flytte musen ned i panelet;
+  // klik igen (eller tryk Esc) for at slippe.
+  const catalogDetails = JSON.parse(document.getElementById("catalog-details").textContent);
+  const detail = document.getElementById("detail");
+  let pinned = null;
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+  function blockCopy(id) {
+    // Blokken kopieres fra fuldteksten, så farver, overstregning og foldning er de samme som dér
+    const copy = document.getElementById(id).cloneNode(true);
+    [copy, ...copy.querySelectorAll("[id]")].forEach(el => el.removeAttribute("id"));
+    [copy, ...copy.querySelectorAll("[hidden]")].forEach(el => el.hidden = false);  // også afsnit slukket i indekset
+    [copy, ...copy.querySelectorAll("details")].forEach(el => el.open = true);
+    copy.classList.remove("all-struck", "head-struck");  // selve blokken vises altid
+    return copy;
+  }
+  function setText(el, text) {
+    el.textContent = text || "–";
+    el.classList.toggle("empty", !text);
+  }
+  function blockLine(el) {
+    // En linje i beskrivelseskolonnen svarer til blok-linjen på samme plads i kolonnen "Blokke"
+    const line = el.closest(".overview td .cell-line");
+    if (!line || line.closest("td.blocks:not(.lines)")) return line;
+    const i = [...line.parentElement.children].indexOf(line);
+    return line.closest("tr").querySelector("td.blocks:not(.lines)").children[i];
+  }
+  function showDetail(line) {
+    const tr = line.closest("tr"), i = [...line.parentElement.children].indexOf(line);
+    const heads = [...tr.closest("table").querySelectorAll("thead th")].map(th => th.textContent.trim());
+    const cellFor = name => heads.includes(name) ? tr.children[heads.indexOf(name)] : null;
+    const textHead = heads.includes("Beskrivelse - skabelon") ? "Beskrivelse - skabelon" : "Tekst";
+    const textLine = cellFor(textHead)?.children[i];
+    const code = tr.dataset.code, fields = catalogDetails[code] || [];
+
+    document.getElementById("detail-title").textContent = code + " · " + (line.dataset.name || "uden for blokke");
+    const block = document.getElementById("detail-block");
+    block.replaceChildren();
+    if (line.dataset.target) block.append(blockCopy(line.dataset.target));
+    else block.innerHTML = '<span class="empty">Forekomsten står ikke i nogen navngiven blok.</span>';
+    block.scrollTop = 0;
+    document.getElementById("detail-template-head").textContent = textHead;
+    setText(document.getElementById("detail-template"), textLine ? textLine.title : "");
+    setText(document.getElementById("detail-catalog"), cellFor("{{ description_header }}")?.textContent.trim() || "");
+    document.getElementById("detail-fields-none").hidden = Boolean(fields.length);
+    document.getElementById("detail-fields-none").textContent = code in catalogDetails ? "–" : "Koden findes ikke i kataloget.";
+    document.getElementById("detail-fields").innerHTML =
+      fields.map(([key, value]) => "<dt>" + esc(key) + "</dt><dd>" + esc(value) + "</dd>").join("");
+
+    document.querySelectorAll(".cell-line.active").forEach(el => el.classList.remove("active"));
+    line.classList.add("active");
+    textLine?.classList.add("active");
+  }
+  function pin(line) {
+    pinned = line;
+    detail.classList.toggle("pinned", Boolean(line));
+    document.getElementById("detail-hint").textContent = line
+      ? "Fastholdt – klik på blokken igen eller tryk Esc for at slippe"
+      : "Hold musen over en blok i kolonnen „Blokke“ – klik for at fastholde den";
+  }
+  document.addEventListener("mouseover", e => {
+    const line = !pinned && blockLine(e.target);
+    if (line) showDetail(line);
+  });
+  document.addEventListener("click", e => {
+    const line = blockLine(e.target);
+    if (!line) return;
+    if (pinned === line) return pin(null);
+    showDetail(line);
+    pin(line);
+  });
+  addEventListener("keydown", e => { if (e.key === "Escape" && pinned) pin(null); });
+
+  // Panelets højde: træk i den øverste kant, piletaster når den har fokus, dobbeltklik nulstiller
+  const detailResizer = document.getElementById("detail-resizer");
+  const setDetailHeight = (px, save) => {
+    const height = Math.round(Math.min(Math.max(px, 120), innerHeight * .85));
+    document.documentElement.style.setProperty("--detail-h", height + "px");
+    if (save) try { localStorage.setItem("detailHeight", height); } catch (e) {}
+  };
+  try { const saved = Number(localStorage.getItem("detailHeight")); if (saved) setDetailHeight(saved); } catch (e) {}
+  detailResizer.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    detailResizer.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing-detail");
+  });
+  detailResizer.addEventListener("pointermove", e => {
+    if (detailResizer.hasPointerCapture(e.pointerId)) setDetailHeight(innerHeight - e.clientY);
+  });
+  const detailResized = () => {
+    if (!document.body.classList.contains("resizing-detail")) return;
+    document.body.classList.remove("resizing-detail");
+    setDetailHeight(detail.offsetHeight, true);
+  };
+  detailResizer.addEventListener("pointerup", detailResized);
+  detailResizer.addEventListener("pointercancel", detailResized);
+  detailResizer.addEventListener("keydown", e => {
+    const step = {ArrowUp: 24, ArrowDown: -24}[e.key];
+    if (step) { e.preventDefault(); setDetailHeight(detail.offsetHeight + step, true); }
+  });
+  detailResizer.addEventListener("dblclick", () => {
+    document.documentElement.style.removeProperty("--detail-h");
+    try { localStorage.removeItem("detailHeight"); } catch (e) {}
+  });
+
+  // Faner: Struktur / Regler og datapunkter. Hver fane husker, hvor langt man var nede på siden;
+  // en fane, man ikke har været i, åbner ved sin begyndelse (lige under fanerne).
   const tabs = document.querySelectorAll("[data-tab]");
-  tabs.forEach(tab => tab.addEventListener("click", () => tabs.forEach(other => {
-    const on = other === tab;
-    other.classList.toggle("active", on);
-    other.setAttribute("aria-selected", on);
-    document.getElementById("tab-" + other.dataset.tab).hidden = !on;
-  })));
+  const tabBar = document.getElementById("tabs"), navbar = document.querySelector(".navbar");
+  function measureBars() {
+    document.documentElement.style.setProperty("--nav-h", navbar.offsetHeight + "px");
+    document.documentElement.style.setProperty("--tabs-h", tabBar.offsetHeight + "px");
+  }
+  measureBars();
+  addEventListener("resize", measureBars);
+  const tabScroll = {};
+  let currentTab = "structure";
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    if (tab.dataset.tab === currentTab) return;
+    tabScroll[currentTab] = scrollY;
+    const start = document.getElementById("tabs-anchor").getBoundingClientRect().top + scrollY - navbar.offsetHeight;
+    tabs.forEach(other => {
+      const on = other === tab;
+      other.classList.toggle("active", on);
+      other.setAttribute("aria-selected", on);
+      document.getElementById("tab-" + other.dataset.tab).hidden = !on;
+    });
+    currentTab = tab.dataset.tab;
+    detail.hidden = currentTab !== "overview";
+    document.body.classList.toggle("with-detail", currentTab === "overview");
+    scrollTo({top: tabScroll[currentTab] ?? Math.min(scrollY, start), behavior: "instant"});
+  }));
   const overviewFilter = document.getElementById("overview-filter");
   overviewFilter.addEventListener("input", () => {
     const query = overviewFilter.value.trim().toLowerCase();
@@ -505,6 +715,30 @@
     });
   });
   overviewFilter.addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });  // Enter må ikke eksportere
+
+  // Klik på en regel (R123=TRUE) eller et datapunkt <<10F ...>> i fuldteksten: skift til
+  // "Regler og datapunkter", rul hen til rækken og lad den blinke kort
+  function overviewRow(el) {
+    const isRule = el.classList.contains("rule");
+    const code = (el.textContent.match(isRule ? /\(\s*(R\w+)/ : /<<\s*(\d\w*|[A-Za-z]{1,4}\d\w*)/) || [])[1];
+    return code && document.querySelector(`.overview tr[data-kind="${isRule ? "rule" : "data"}"][data-code="${CSS.escape(code)}"]`);
+  }
+  // Kun dem, der faktisk har en række, bliver klikbare (fx ikke et "datapunkt" med andre felter inden i)
+  document.querySelectorAll(".tree .rule, .tree .field.data").forEach(el => {
+    if (overviewRow(el)) { el.classList.add("linked"); el.title = "Vis i Regler og datapunkter"; }
+  });
+  document.addEventListener("click", e => {
+    const hit = e.target.closest(".tree .linked");
+    const row = hit && overviewRow(hit);
+    if (!row) return;
+    e.preventDefault();  // ellers foldes blokken sammen, når der klikkes i dens overskrift
+    if (row.hidden) { overviewFilter.value = ""; overviewFilter.dispatchEvent(new Event("input")); }
+    document.querySelector('[data-tab="overview"]').click();
+    row.scrollIntoView({block: "center", behavior: "instant"});
+    row.classList.remove("flash");
+    void row.offsetWidth;  // genstart animationen
+    row.classList.add("flash");
+  });
 
   // Klik i indekset finder altid afsnittet: det tændes, de ydre blokke foldes ud, og det blinker kort
   document.querySelectorAll(".index a").forEach(link => link.addEventListener("click", e => {

@@ -25,6 +25,9 @@ TOKEN = re.compile(f"({STRUCK}?(?:<<|>>|<(?={STRIKE_ON}?\\w+:)))")
 HILITE = re.compile(STRUCK + r"?(?:<<|>>)|\[[A-Z]*\d+\.\d+\]|\(R\w+=\w+\)|\b(?:ELLER|OG)\b")
 OPERATOR = re.compile(r"<<|>>|[()]|\b(?:ELLER|OG)\b")
 MARKS = re.compile(f"[{STRIKE_ON}{STRIKE_OFF}{STRUCK}]")
+# Koden i et datapunkt: et tal først (10F, 140dGV) eller op til fire bogstaver og et tal (VM127, VM91c_db).
+# K123 er blokke og R123 regler, så de tæller ikke.
+DATA_CODE = r"(?:\d\w*|(?![KkRr]\d)[A-Za-z]{1,4}\d\w*)"
 MAX_LABEL_WORDS = 8  # så mange ord af første linje kan indgå i et lukke-navn
 LABEL = re.compile(f"{STRIKE_ON}?[\\w=]+:?{STRIKE_OFF}?")
 

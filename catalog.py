@@ -17,10 +17,19 @@ from pathlib import Path
 
 CONFIG = Path(__file__).with_name("config.ini")
 CATALOG_HEADER = "I katalog"
+DESCRIPTION_HEADER = "Beskrivelse - katalog"
 
 
 class Keyword(str):
     """Et EDN-keyword som :titel eller :regel/R1, gemt uden kolon."""
+
+
+class Symbol(str):
+    """Et EDN-symbol som fn eller clojure.string/join (vises uden anførselstegn)."""
+
+
+class EdnList(tuple):
+    """En liste i parenteser, fx (fn [x] ...), til forskel fra en vektor i firkantede parenteser."""
 
 
 class Tagged:
@@ -76,7 +85,7 @@ def atom(token: str):
             return kind(number)
         except ValueError:
             pass
-    return token  # symbol
+    return Symbol(token)
 
 
 class Reader:
@@ -129,16 +138,24 @@ class Reader:
             if len(items) % 2:
                 raise self.error("Et map har et ulige antal elementer")
             return {hashable(items[i]): items[i + 1] for i in range(0, len(items), 2)}
-        if ch in "[(":
+        if ch == "[":
             return tuple(self.items(ch))
+        if ch == "(":
+            return EdnList(self.items(ch))
         if ch == "#":
             nxt = self.text[self.pos + 1:self.pos + 2]
             if nxt == "{":
                 self.pos += 1
                 return frozenset(hashable(item) for item in self.items("{"))
-            if nxt in ('"', "(", "'"):  # #"regex", #(funktion) og #'var læses som det, der følger
+            if nxt == '"':  # #"regex" gemmes, som den står (\d skal ikke læses som en escape)
+                m = STRING.match(self.text, self.pos + 1)
+                if not m:
+                    raise self.error("En tekst lukkes aldrig")
+                self.pos = m.end()
+                return Tagged("regex", m.group(1))
+            if nxt in ("(", "'"):  # #(funktion) og #'var
                 self.pos += 1 + (nxt == "'")
-                return self.read()
+                return Tagged("" if nxt == "(" else "'", self.read())
             if nxt == "#":  # ##Inf, ##-Inf, ##NaN
                 m = TOKEN.match(self.text, self.pos + 2)
                 self.pos = m.end() if m else self.pos + 2
@@ -196,13 +213,13 @@ def normalize(code: str) -> str:
 
 
 FALLBACK_KEY = re.compile(r':([^\s,()\[\]{}";]+)\s*\{')
-FALLBACK_TITLE = re.compile(r':titel\s+"((?:[^"\\]|\\.)*)"')
+FALLBACK_FIELD = r':{}\s+"((?:[^"\\]|\\.)*)"'
 
 
 class Catalog:
     def __init__(self, path: Path):
         self.path = path
-        self.titles: dict[str, str] = {}  # normaliseret kode → titel
+        self.entries: dict[str, dict] = {}  # normaliseret kode → {"titel", "beskr"}
         self.warning = ""
         text = path.read_text(encoding="utf-8")
         try:
@@ -216,12 +233,16 @@ class Catalog:
 
     @staticmethod
     def fallback(text: str) -> dict:
-        """Find alle :nøgle {...} og den første :titel "..." efter hver af dem."""
+        """Find alle :nøgle {...} og den første :titel "..." og :beskr "..." efter hver af dem."""
         keys = list(FALLBACK_KEY.finditer(text))
         found = {}
         for key, nxt in zip(keys, keys[1:] + [None]):
-            title = FALLBACK_TITLE.search(text, key.end(), nxt.start() if nxt else len(text))
-            found[Keyword(key.group(1))] = {Keyword("titel"): unescape(title.group(1)) if title else ""}
+            end = nxt.start() if nxt else len(text)
+            entry = {}
+            for field in ("titel", "beskr"):
+                m = re.compile(FALLBACK_FIELD.format(field)).search(text, key.end(), end)
+                entry[Keyword(field)] = unescape(m.group(1)) if m else ""
+            found[Keyword(key.group(1))] = entry
         return found
 
     def add(self, form) -> None:
@@ -232,19 +253,28 @@ class Catalog:
         if not isinstance(form, dict):
             return
         for key, value in form.items():
-            title = value.get(Keyword("titel"), "") if isinstance(value, dict) else ""
-            title = title if isinstance(title, str) else ""
+            fields = value if isinstance(value, dict) else {}
+            entry = {"titel": text_of(fields.get(Keyword("titel"))), "beskr": text_of(fields.get(Keyword("beskr"))),
+                     "fields": [[show(field), show(item)] for field, item in fields.items()]}
             name = str(key).rsplit("/", 1)[-1]  # :regel/R1 → R1
-            self.titles.setdefault(normalize(name), title)
-            prefix = title.split(":", 1)[0]
-            if ":" in title and prefix.strip() and " " not in prefix.strip():
-                self.titles.setdefault(normalize(prefix), title)
+            self.entries.setdefault(normalize(name), entry)
+            prefix = entry["titel"].split(":", 1)[0]
+            if ":" in entry["titel"] and prefix.strip() and " " not in prefix.strip():
+                self.entries.setdefault(normalize(prefix), entry)
 
     def __len__(self) -> int:
-        return len(self.titles)
+        return len(self.entries)
 
     def __contains__(self, code: str) -> bool:
-        return normalize(code) in self.titles
+        return normalize(code) in self.entries
+
+    def fields(self, code: str) -> list[list[str]]:
+        """Alle kodens oplysninger i kataloget som [felt, værdi]-par, skrevet som EDN."""
+        return self.entries.get(normalize(code), {}).get("fields", [])
+
+    def description(self, code: str) -> str:
+        """Kodens :beskr fra kataloget; tom, hvis den ikke findes eller ikke har nogen."""
+        return self.entries.get(normalize(code), {}).get("beskr", "")
 
 
 _cache: dict[tuple, Catalog] = {}
@@ -282,8 +312,55 @@ def configured_catalog() -> tuple[Catalog | None, str]:
     return _cache[key], _cache[key].warning
 
 
+def show(value, indent: int = 0) -> str:
+    """Skriv en katalogværdi tilbage som læsbar EDN; store maps og vektorer brydes over flere linjer."""
+    pad = " " * (indent + 1)
+    if value is None:
+        return "nil"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, Keyword):
+        return ":" + value
+    if isinstance(value, Symbol):
+        return str(value)
+    if isinstance(value, str):
+        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    if isinstance(value, Tagged):
+        if value.tag == "regex":
+            return '#"' + value.value + '"'
+        if value.tag in ("", "'"):
+            return "#" + value.tag + show(value.value, indent + 1 + len(value.tag))
+        return f"#{value.tag} {show(value.value, indent)}"
+    if isinstance(value, dict):
+        parts = [f"{show(k)} {show(v, indent + len(show(k)) + 2)}" for k, v in value.items()]
+        opener, closer = "{", "}"
+    elif isinstance(value, (tuple, list, frozenset)):
+        parts = [show(item, indent + 1) for item in value]
+        opener, closer = ("#{", "}") if isinstance(value, frozenset) else ("(", ")") if isinstance(value, EdnList) else ("[", "]")
+    else:
+        return str(value)
+    flat = opener + " ".join(parts) + closer
+    if len(flat) <= 70 and "\n" not in flat:
+        return flat
+    return opener + ("\n" + pad).join(parts) + closer
+
+
+def text_of(value) -> str:
+    """En katalogværdi som tekst: tekster som de er, lister samlet med mellemrum, nil som tomt."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return " ".join(value.split())
+    if isinstance(value, (tuple, list)):
+        return " ".join(text_of(item) for item in value if item is not None)
+    return str(value)
+
+
 def add_catalog_column(table: dict, catalog: Catalog) -> None:
-    """Indsæt kolonnen "I katalog" (Ja/Nej) lige efter koden i en tabel fra overview.collect."""
+    """Indsæt "I katalog" (Ja/Nej) lige efter koden og "Beskrivelse - katalog" (:beskr) sidst
+    i en tabel fra overview.collect."""
     table["headers"].insert(1, CATALOG_HEADER)
+    table["headers"].append(DESCRIPTION_HEADER)
     for row in table["rows"]:
         row.insert(1, "Ja" if row[0] in catalog else "Nej")
+        row.append(catalog.description(row[0]))

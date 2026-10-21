@@ -1,0 +1,167 @@
+/* "Sage and Sand" – farveskema og finpudsning oven på Bootstrap 5.3.
+   Indlæses efter Bootstrap og efter skabelonens egen <style>, så variablerne her vinder.
+   Paletten gælder det lyse tema; det mørke tema beholder sine farver, men får samme accentfarve. */
+
+/* --- Paletten --- */
+[data-bs-theme="light"] {
+  --sage: #6B8F71;
+  --sage-dark: #5A7A5F;
+  --sage-rgb: 107, 143, 113;
+  --sand: #E8E3D7;
+  --sand-soft: #EFEDE5;
+  --paper: #F7F5F0;
+  --ink: #2F3E36;
+  --ink-muted: #7A776B;
+  --ok-bg: #DCE8DD;
+  --ok-text: #34503A;
+  --warn-bg: #F1E6CF;
+  --warn-text: #6B5321;
+
+  /* Bootstrap: flader, tekst og kanter */
+  --bs-body-bg: #FFFEFB;
+  --bs-body-bg-rgb: 255, 254, 251;
+  --bs-tertiary-bg: var(--paper);
+  --bs-tertiary-bg-rgb: 247, 245, 240;
+  --bs-secondary-bg: var(--sand);
+  --bs-secondary-bg-rgb: 232, 227, 215;
+  --bs-body-color: var(--ink);
+  --bs-body-color-rgb: 47, 62, 54;
+  --bs-emphasis-color: var(--ink);
+  --bs-secondary-color: var(--ink-muted);
+  --bs-secondary-color-rgb: 122, 119, 107;
+  --bs-border-color: var(--sand);
+  --bs-border-color-translucent: rgba(47, 62, 54, .12);
+
+  /* Bootstrap: accent (knapper, links, aktive tilstande) */
+  --bs-primary: var(--sage);
+  --bs-primary-rgb: var(--sage-rgb);
+  --bs-primary-bg-subtle: #E4ECE5;
+  --bs-primary-border-subtle: #C3D4C5;
+  --bs-primary-text-emphasis: var(--ok-text);
+  --bs-link-color: var(--sage);
+  --bs-link-color-rgb: var(--sage-rgb);
+  --bs-link-hover-color: var(--sage-dark);
+  --bs-link-hover-color-rgb: 90, 122, 95;
+  --bs-focus-ring-color: rgba(var(--sage-rgb), .25);
+  --bs-success-rgb: 52, 80, 58;
+  --bs-danger: #B4533A;
+  --bs-danger-rgb: 180, 83, 58;
+  --bs-warning-bg-subtle: var(--warn-bg);
+
+  /* Appens egne farver i fuldteksten, stemt af efter paletten */
+  --c0: #5E7F9A;   /* skifer   */
+  --c1: #6B8F71;   /* salvie   */
+  --c2: #8A6A8F;   /* blomme   */
+  --c3: #B07A4F;   /* ler      */
+  --c4: #4F8A8B;   /* havgrøn  */
+  --bad: #B4533A;
+  --field: #3F5F6E;  --field-bg: #E4ECEF;
+  --data: #5C4A12;   --data-bg: #F6E7A6;
+  --rule: #8A4F2A;   --rule-bg: #F3E4D8;
+  --op: #8A5A8C;
+}
+
+/* Det mørke tema: kun accentfarven, så knapper og fokus passer til det lyse */
+[data-bs-theme="dark"] {
+  --sage: #8DB093;
+  --sage-dark: #7A9E80;
+  --sage-rgb: 141, 176, 147;
+  --bs-primary: var(--sage);
+  --bs-primary-rgb: var(--sage-rgb);
+  --bs-primary-bg-subtle: #22302A;
+  --bs-primary-text-emphasis: #C9DCCB;
+  --bs-link-color: var(--sage);
+  --bs-link-color-rgb: var(--sage-rgb);
+  --bs-link-hover-color: #A9C6AE;
+  --bs-focus-ring-color: rgba(var(--sage-rgb), .3);
+  --ok-bg: #2B3D2F;   --ok-text: #C9DCCB;
+  --warn-bg: #3D3322; --warn-text: #E6D3A8;
+}
+
+/* --- Knapper --- */
+.btn-primary {
+  --bs-btn-bg: var(--sage);
+  --bs-btn-border-color: var(--sage);
+  --bs-btn-hover-bg: var(--sage-dark);
+  --bs-btn-hover-border-color: var(--sage-dark);
+  --bs-btn-active-bg: var(--sage-dark);
+  --bs-btn-active-border-color: var(--sage-dark);
+  --bs-btn-disabled-bg: var(--sage);
+  --bs-btn-disabled-border-color: var(--sage);
+  --bs-btn-focus-shadow-rgb: var(--sage-rgb);
+}
+.btn-outline-secondary {
+  --bs-btn-color: var(--bs-body-color);
+  --bs-btn-border-color: var(--bs-border-color);
+  --bs-btn-hover-color: var(--bs-body-color);
+  --bs-btn-hover-bg: var(--sand-soft, var(--bs-tertiary-bg));
+  --bs-btn-hover-border-color: var(--bs-border-color);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--sage);
+  --bs-btn-active-border-color: var(--sage);
+  --bs-btn-disabled-color: var(--bs-secondary-color);
+  --bs-btn-disabled-border-color: var(--bs-border-color);
+  --bs-btn-focus-shadow-rgb: var(--sage-rgb);
+}
+.btn { --bs-btn-font-weight: 500; }
+
+/* --- Formularfelter: fokusring i salvie --- */
+.form-control:focus, .form-select:focus, .form-check-input:focus {
+  border-color: var(--sage);
+  box-shadow: 0 0 0 .25rem var(--bs-focus-ring-color);
+}
+.form-check-input:checked { background-color: var(--sage); border-color: var(--sage); }
+.form-control::placeholder { color: var(--bs-secondary-color); }
+
+/* --- Kort og bjælke --- */
+.card { --bs-card-border-color: var(--bs-border-color); --bs-card-cap-bg: transparent; }
+.shadow-sm { box-shadow: 0 1px 2px rgba(47, 62, 54, .05) !important; }
+.navbar { --bs-navbar-brand-color: var(--bs-body-color); --bs-navbar-brand-hover-color: var(--bs-body-color); }
+.navbar.bg-body { background-color: var(--bs-body-bg) !important; }
+.brand-mark { color: var(--sage); }
+
+/* --- Faner --- */
+.nav-tabs {
+  --bs-nav-tabs-border-color: var(--bs-border-color);
+  --bs-nav-tabs-link-hover-border-color: transparent transparent var(--bs-border-color);
+  --bs-nav-tabs-link-active-color: var(--bs-body-color);
+  --bs-nav-tabs-link-active-bg: var(--bs-body-bg);
+  --bs-nav-tabs-link-active-border-color: var(--bs-border-color) var(--bs-border-color) var(--bs-body-bg);
+  --bs-nav-link-hover-color: var(--sage-dark);
+}
+
+/* --- Mærkater: status i rolige pastelfarver --- */
+.badge.text-bg-success { background-color: var(--ok-bg) !important; color: var(--ok-text) !important; }
+.overview .badge.text-bg-danger { background-color: var(--warn-bg) !important; color: var(--warn-text) !important; }
+.badge { font-weight: 500; }
+.overview .badge { padding: .3em .7em; border-radius: 999px; }
+
+/* --- Tabellerne i registeret: tynde vandrette streger, luft, rolige overskrifter --- */
+.overview .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-border-color: var(--bs-border-color);
+  --bs-table-hover-bg: var(--sand-soft, var(--bs-tertiary-bg));
+  --bs-table-hover-color: var(--bs-body-color);
+  --bs-table-striped-bg: var(--sand-soft, var(--bs-tertiary-bg));
+  border-color: var(--bs-border-color);
+}
+.overview .table > :not(caption) > * > * { padding: .6rem .8rem; border-left: 0; border-right: 0; }
+.overview .table > :not(caption) > * > td.blocks { padding-block: 0; }  /* linjerne i "Blokke" skal flugte */
+.overview .table thead th {
+  font-size: .72rem; font-weight: 500; letter-spacing: .03em; color: var(--bs-secondary-color);
+  text-transform: uppercase;
+}
+.overview td.num, .overview th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.overview td.num:has(> .badge) { text-align: left; }  /* "I katalog" flugter med sin overskrift */
+.overview .card-header { font-weight: 600; }
+.cell-line.active { background: var(--bs-primary-bg-subtle); }
+/* På små skærme ruller tabellerne vandret i deres kort */
+@media (max-width: 900px) { .overview .card { overflow-x: auto; } }
+
+/* --- Indeks, drop-felt og detaljepanel --- */
+.index li:hover { background: var(--sand-soft, var(--bs-tertiary-bg)); }
+.dropzone svg { color: var(--sage); }
+#detail h3 { color: var(--bs-secondary-color); }
+#detail dt { color: var(--c2); }
+#detail.pinned .detail-head { background: var(--bs-primary-bg-subtle); }

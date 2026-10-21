@@ -45,7 +45,8 @@ Port 5000 er undgået, fordi den er optaget af AirPlay på macOS.
   Tekst kan også indsættes direkte under "… eller indsæt tekst".
 - **Træet:** hver `<<...>>`-blok er en farvet ramme, der kan foldes sammen. Overskrifter fra Word vises
   i størrelse efter niveau, og Word-tabeller vises som tabeller. Datapunkter som `<<10F vurderingsår>>`
-  har gul baggrund.
+  og `<<VM127 …>>` har gul baggrund. Et klik på en regel eller et datapunkt fører til dens række under
+  "Regler og datapunkter".
 - **Manglende lukninger:** en blok, der aldrig lukkes, er markeret med MANGLER LUKNING ved åbningen og
   "… mangler lukning" med blokkens navn, der hvor den slutter.
 - **Overstreget tekst:** tekst, der er overstreget i Word (eller slettet med "Registrer ændringer"),
@@ -55,14 +56,22 @@ Port 5000 er undgået, fordi den er optaget af AirPlay på macOS.
   og et klik ruller hen til afsnittet. Bredden kan trækkes i kanten.
 - **Højreklik** på et afsnit (i indekset eller i træet) giver "Vis kun dette afsnit", "Vis alle
   afsnit" og, i træet, "Vis i indeks". Hold Shift nede for browserens egen menu.
-- **Fanen "Regler og datapunkter"** viser alle regler (`(R123=TRUE)`) og datapunkter (`<<10F ...>>`)
-  med antal forekomster, hvor mange af dem der er overstreget, og hvilke K-blokke de står i.
-  Tabellerne kan eksporteres til Excel (.xlsx) eller CSV (semikolon, så dansk Excel åbner dem rigtigt).
+- **Fanerne** "Struktur" og "Regler og datapunkter" står fast øverst, og hver fane husker, hvor langt
+  man var nede på siden.
+- **Fanen "Regler og datapunkter"** viser alle regler (`(R123=TRUE)`) og datapunkter (`<<10F ...>>`,
+  `<<VM127 ...>>`). Kolonnen "Blokke" har én linje pr. blok, reglen eller datapunktet står i, og
+  beskrivelsen fra skabelonen står på samme linje. Rækker, hvor alt er overstreget, forsvinder, når
+  overstreget tekst skjules. Tabellerne kan eksporteres til Excel (.xlsx) eller CSV (semikolon, så
+  dansk Excel åbner dem rigtigt).
+- **Detaljepanelet** i den nederste del af skærmen viser blokken, beskrivelsen fra skabelonen, beskrivelsen
+  fra kataloget og alle katalogets oplysninger for den blok, musen er over i kolonnen "Blokke". Et klik
+  fastholder blokken (klik igen eller tryk Esc for at slippe), og panelets højde kan trækkes i kanten.
 
 ### Katalog over regler og datapunkter
 
 Har man et katalog over regler og datapunkter i EDN-format, viser fanen "Regler og datapunkter" en
-kolonne "I katalog", der er grøn, hvis koden findes i kataloget, og rød, hvis den ikke gør.
+kolonne "I katalog", der er grøn, hvis koden findes i kataloget, og sandfarvet, hvis den ikke gør, og en
+kolonne "Beskrivelse - katalog" med kodens `:beskr`.
 
 1. Kopiér `config.example.ini` til `config.ini`.
 2. Skriv stien til katalogfilen:

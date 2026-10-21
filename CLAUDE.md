@@ -10,4 +10,7 @@ Retningslinjer for ændringer:
 - Koden skal kunne køre på Python 3.9 (fx ingen backslash i f-string-udtryk).
 - Siden skal virke uden internetadgang: ingen CDN'er, alt ligger lokalt i `static/`.
 - Læg aldrig rigtige skabeloner, kataloger eller andre data i repoet.
+- Farverne ligger i `static/custom.css` ("Sage and Sand") som Bootstrap 5.3-variabler oven på Bootstrap;
+  skabelonens egen `<style>` står før den. Hvad der tæller som et datapunkt, styres af `DATA_CODE` i
+  `rule_parser.py`.
 - Der er ingen automatiske tests; kontrollér ændringer ved at køre begge visninger på `test_document.docx`.

@@ -11,22 +11,44 @@ import re
 import zipfile
 from xml.sax.saxutils import escape, quoteattr
 
-from rule_parser import MARKS, STRIKE_OFF, STRIKE_ON
+from rule_parser import DATA_CODE, MARKS, STRIKE_OFF, STRIKE_ON
 
 RULE = re.compile(r"\(\s*(R\w+)\s*=\s*(\w+)\s*\)")
-DATA = re.compile(r"<<\s*(\d\w*)([^<>]*)>>")
+DATA = re.compile(rf"<<\s*({DATA_CODE})(?![^\s<>])([^<>]*)>>")
 # Her starter teksten, der beskriver en regel: efter forrige regel, ELLER/OG, <<, >>, "(dvs." eller et kommentarmærke
 BREAK = re.compile(r"\(\s*R\w+\s*=\s*\w+\s*\)|\b(?:ELLER|OG)\b|<<|>>|\(dvs\.|\[[A-Z]*\d+\.\d+\]")
 NATURAL = re.compile(r"(\d+)")
 
-RULE_HEADERS = ["Regel", "Værdi", "Forekomster", "Heraf overstreget", "Blokke", "Beskrivelse (teksten foran reglen)"]
-DATA_HEADERS = ["Datapunkt", "Tekst", "Forekomster", "Heraf overstreget", "Blokke"]
+RULE_HEADERS = ["Regel", "Værdi", "Blokke", "Beskrivelse - skabelon"]
+DATA_HEADERS = ["Datapunkt", "Tekst", "Blokke"]
 MAX_VARIANTS = 5  # så mange forskellige beskrivelser/tekster vises pr. regel eller datapunkt
 
 
 def natural(key: str) -> list:
     """Sorteringsnøgle, så R2 kommer før R10 og 10F før 140a."""
     return [int(part) if part.isdigit() else part.lower() for part in NATURAL.split(key)]
+
+
+def block_source(item: dict) -> str:
+    """Blokkens tekst med mærker, indrykket efter indlejring (bruges til linjen i kolonnen "Blokke")."""
+    lines: list[str] = []
+
+    def add(block: dict, depth: int) -> None:
+        pad = "  " * depth
+        lines.append(pad + " ".join(filter(None, [block["opener"] + block["label"], *block["clauses"]])))
+        for child in block["children"]:
+            if child["type"] == "text":
+                lines.extend(pad + "  " + line for line in child["lines"])
+            elif child["type"] == "table":
+                lines.extend(pad + "  " + " | ".join(row) for row in child["rows"])
+            elif child["type"] == "heading":
+                lines.append(pad + "  " + child["text"])
+            else:
+                add(child, depth + 1)
+        lines.append(pad + (block["closer"] if block["closer"] is not None else f"({block['name']} mangler lukning)"))
+
+    add(item, 0)
+    return "\n".join(lines)
 
 
 def block_name(item: dict) -> tuple[str, str]:
@@ -40,9 +62,24 @@ def block_name(item: dict) -> tuple[str, str]:
 
 
 def collect(tree: list[dict]) -> dict:
-    """Find alle regler og datapunkter. Giver {"rules": {"headers", "rows"}, "data": {"headers", "rows"}}."""
+    """Find alle regler og datapunkter.
+
+    Giver {"rules": tabel, "data": tabel, "blocks": {id: {"name", "line", "item"}}}, hvor en tabel er
+    {"headers", "rows", "blocks", "lines", "struck"}: "blocks" har for hver række id'erne på blokkene i
+    kolonnen "Blokke" (tomt id = uden for blokke), "lines" beskrivelserne/teksterne fra hver af dem, og
+    "struck" om alle rækkens forekomster er overstregede.
+    """
     rules: dict[str, dict] = {}
     data: dict[str, dict] = {}
+    registry: dict[int, dict] = {}  # id(blok) → {"id", "item"}
+
+    def ref(item: dict | None) -> str:
+        """Et kort id for en blok i træet; tomt for ingen blok."""
+        if item is None:
+            return ""
+        if id(item) not in registry:
+            registry[id(item)] = {"id": f"b{len(registry) + 1}", "item": item}
+        return registry[id(item)]["id"]
     struck = False  # overstregning kan fortsætte fra én streng til den næste, ligesom i visningen
 
     def clean(text: str) -> tuple[str, list[bool]]:
@@ -61,9 +98,10 @@ def collect(tree: list[dict]) -> dict:
         rec = table.setdefault(key, {"count": 0, "struck": 0, "blocks": {}, "variants": {}, "values": {}})
         rec["count"] += 1
         rec["struck"] += is_struck
-        if block:
-            rec["blocks"][block] = True
+        # Pr. blok (tom = uden for alle navngivne blokke): de beskrivelser/tekster, der står dér
+        found = rec["blocks"].setdefault(block, {})
         if variant:
+            found[variant] = True
             rec["variants"][variant] = True
         return rec
 
@@ -77,9 +115,9 @@ def collect(tree: list[dict]) -> dict:
         for m in DATA.finditer(plain):
             note(data, m.group(1), flags[m.start(1)], block, " ".join(m.group(2).split()))
 
-    def walk(items: list[dict], k_block: str, other: str) -> None:
-        # "Blokke" er den nærmeste K-blok udenom; kun uden for alle K-blokke bruges et andet bloknavn
-        block = k_block or other
+    def walk(items: list[dict], k_block: dict | None, other: dict | None) -> None:
+        # "Blokke" er den nærmeste K-blok udenom; kun uden for alle K-blokke bruges en anden navngiven blok
+        block = ref(k_block or other)
         for item in items:
             if item["type"] == "text":
                 for line in item["lines"]:
@@ -92,24 +130,50 @@ def collect(tree: list[dict]) -> dict:
                 scan(item["text"], block)
             else:
                 own_k, own_other = block_name(item)
-                inner_k, inner_other = own_k or k_block, own_other or other
+                inner_k = item if own_k else k_block
+                inner_other = item if own_other else other
                 for text in [item["label"], *item["clauses"]]:
-                    scan(text, inner_k or inner_other)
+                    scan(text, ref(inner_k or inner_other))
                 walk(item["children"], inner_k, inner_other)
                 clean(item["closer"] or "")
 
-    def variants(rec: dict) -> str:
-        shown = list(rec["variants"])
+    def joined(shown: list) -> str:
         return " / ".join(shown[:MAX_VARIANTS]) + (" / …" if len(shown) > MAX_VARIANTS else "")
 
-    walk(tree, "", "")
+    def variants(rec: dict) -> str:
+        return joined(list(rec["variants"]))
+
+    def per_block(rec: dict) -> list[str]:
+        """Beskrivelserne/teksterne blok for blok, i samme rækkefølge som kolonnen "Blokke"."""
+        return [joined(list(found)) for found in rec["blocks"].values()]
+
+    walk(tree, None, None)
+    blocks = {}
+    for entry in registry.values():
+        own_k, own_other = block_name(entry["item"])
+        source = block_source(entry["item"])
+        blocks[entry["id"]] = {"name": own_k or own_other, "item": entry["item"],
+                               "line": " ".join(MARKS.sub("", source[:400]).split())}
+
+    def names(rec: dict) -> str:  # til eksporten: blokkenes navne
+        return ", ".join(blocks[bid]["name"] for bid in rec["blocks"] if bid)
+
+    rules_sorted = sorted(rules.items(), key=lambda kv: natural(kv[0]))
+    data_sorted = sorted(data.items(), key=lambda kv: natural(kv[0]))
+    # Overskrifterne kopieres, fordi kataloget sætter kolonner ind i dem; ellers ville de fælles lister
+    # vokse ved hver indlæsning af siden
     return {
-        "rules": {"headers": RULE_HEADERS, "rows": [
-            [key, ", ".join(rec["values"]), rec["count"], rec["struck"], ", ".join(rec["blocks"]), variants(rec)]
-            for key, rec in sorted(rules.items(), key=lambda kv: natural(kv[0]))]},
-        "data": {"headers": DATA_HEADERS, "rows": [
-            [key, variants(rec), rec["count"], rec["struck"], ", ".join(rec["blocks"])]
-            for key, rec in sorted(data.items(), key=lambda kv: natural(kv[0]))]},
+        "rules": {"headers": list(RULE_HEADERS), "blocks": [list(rec["blocks"]) for _, rec in rules_sorted],
+                  "lines": [per_block(rec) for _, rec in rules_sorted],
+                  "struck": [rec["struck"] == rec["count"] for _, rec in rules_sorted], "rows": [
+            [key, ", ".join(rec["values"]), names(rec), variants(rec)]
+            for key, rec in rules_sorted]},
+        "data": {"headers": list(DATA_HEADERS), "blocks": [list(rec["blocks"]) for _, rec in data_sorted],
+                 "lines": [per_block(rec) for _, rec in data_sorted],
+                 "struck": [rec["struck"] == rec["count"] for _, rec in data_sorted], "rows": [
+            [key, variants(rec), names(rec)]
+            for key, rec in data_sorted]},
+        "blocks": blocks,
     }
 
 
