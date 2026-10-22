@@ -96,6 +96,12 @@
   .overview th { position: sticky; top: var(--stack); z-index: 1; background: var(--bs-body-bg); white-space: nowrap;
                  box-shadow: inset 0 -1px var(--bs-border-color); }
   .overview td.description { min-width: 16rem; color: var(--bs-secondary-color); }
+  /* Glid mellem fanerne: under et skift står de to sider side om side i sporet, som glider vandret.
+     I ro er kun den aktive side vist, og sporet har ingen transform (så faste elementer virker som før). */
+  #pages.sliding { overflow: hidden; }
+  #pages.sliding #track { display: flex; gap: 2rem; align-items: flex-start; }
+  #pages.sliding #track > * { flex: 0 0 100%; }
+
   /* Detaljepanelet i nederste halvdel af skærmen på fanen "Regler og datapunkter" */
   :root { --detail-h: 45vh; }  /* panelets højde; kan trækkes i den øverste kant */
   #detail { position: fixed; left: 0; right: 0; bottom: 0; height: var(--detail-h); z-index: 1005; display: flex; flex-direction: column;
@@ -289,6 +295,52 @@
     </li>
   </ul>
 
+  <!-- De to faner ligger i et spor: "Struktur" til venstre, "Regler og datapunkter" til højre -->
+  <div id="pages"><div id="track">
+  <div id="tab-structure" role="tabpanel" class="layout{{ ' no-index' if not index }}">
+    {% if index %}
+    <nav class="index card shadow-sm" aria-label="Afsnit">
+      <div class="card-header bg-transparent">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <span class="fw-semibold fs-6">Afsnit</span>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary py-0" data-all="1">Vis alle</button>
+            <button type="button" class="btn btn-outline-secondary py-0" data-all="">Skjul alle</button>
+          </div>
+        </div>
+        <input type="search" id="filter" class="form-control form-control-sm mt-2" placeholder="Søg i afsnit …" aria-label="Søg i afsnit">
+      </div>
+      <div class="card-body p-2">
+        <ul class="list-unstyled mb-0">
+          {% for entry in index %}
+          <li class="{{ entry.kind }}{{ ' all-struck' if entry.struck }}{{ ' head-struck' if entry.head_struck }}" style="--indent: {{ entry.indent }}">
+            <input type="checkbox" class="form-check-input" checked data-target="{{ entry.id }}" aria-label="Vis {{ entry.title }}">
+            <a href="#{{ entry.id }}" title="{{ entry.title }}">{{ entry.html }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="text-body-secondary px-1 py-2" id="no-match" hidden>Ingen afsnit matcher.</div>
+      </div>
+      <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" tabindex="0"
+           title="Træk for at ændre bredden (dobbeltklik nulstiller)"></div>
+    </nav>
+    {% endif %}
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent legend">
+        <span><span class="field data">&lt;&lt;10F datapunkt&gt;&gt;</span></span>
+        <span><span class="field">&lt;&lt;K1 … K1&gt;&gt;</span> blok på én linje</span>
+        <span><span class="rule">(R123=TRUE)</span> regelhenvisning</span>
+        <span><span class="ref">[AV189.1]</span> kommentarmærke</span>
+        <span><span class="op">ELLER</span> / <span class="op">OG</span></span>
+        <span><s class="strike">overstreget</s></span>
+      </div>
+      <div class="card-body tree">
+        {% if tree %}{{ render(tree, 0) }}{% else %}<span class="text-body-secondary">Ingen tekst at vise.</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
   <div id="tab-overview" class="overview" role="tabpanel" hidden>
     <form method="post" action="{{ url_for('export') }}" class="d-flex flex-wrap align-items-center gap-2 mb-3">
       <input type="search" id="overview-filter" class="form-control form-control-sm" style="max-width: 20rem"
@@ -345,50 +397,7 @@
     {{ table("Regler", "rule", overview.rules) }}
     {{ table("Datapunkter", "data", overview.data) }}
   </div>
-
-  <div id="tab-structure" role="tabpanel" class="layout{{ ' no-index' if not index }}">
-    {% if index %}
-    <nav class="index card shadow-sm" aria-label="Afsnit">
-      <div class="card-header bg-transparent">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-          <span class="fw-semibold fs-6">Afsnit</span>
-          <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary py-0" data-all="1">Vis alle</button>
-            <button type="button" class="btn btn-outline-secondary py-0" data-all="">Skjul alle</button>
-          </div>
-        </div>
-        <input type="search" id="filter" class="form-control form-control-sm mt-2" placeholder="Søg i afsnit …" aria-label="Søg i afsnit">
-      </div>
-      <div class="card-body p-2">
-        <ul class="list-unstyled mb-0">
-          {% for entry in index %}
-          <li class="{{ entry.kind }}{{ ' all-struck' if entry.struck }}{{ ' head-struck' if entry.head_struck }}" style="--indent: {{ entry.indent }}">
-            <input type="checkbox" class="form-check-input" checked data-target="{{ entry.id }}" aria-label="Vis {{ entry.title }}">
-            <a href="#{{ entry.id }}" title="{{ entry.title }}">{{ entry.html }}</a>
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="text-body-secondary px-1 py-2" id="no-match" hidden>Ingen afsnit matcher.</div>
-      </div>
-      <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" tabindex="0"
-           title="Træk for at ændre bredden (dobbeltklik nulstiller)"></div>
-    </nav>
-    {% endif %}
-
-    <div class="card shadow-sm">
-      <div class="card-header bg-transparent legend">
-        <span><span class="field data">&lt;&lt;10F datapunkt&gt;&gt;</span></span>
-        <span><span class="field">&lt;&lt;K1 … K1&gt;&gt;</span> blok på én linje</span>
-        <span><span class="rule">(R123=TRUE)</span> regelhenvisning</span>
-        <span><span class="ref">[AV189.1]</span> kommentarmærke</span>
-        <span><span class="op">ELLER</span> / <span class="op">OG</span></span>
-        <span><s class="strike">overstreget</s></span>
-      </div>
-      <div class="card-body tree">
-        {% if tree %}{{ render(tree, 0) }}{% else %}<span class="text-body-secondary">Ingen tekst at vise.</span>{% endif %}
-      </div>
-    </div>
-  </div>
+  </div></div>
 </main>
 
 <section id="detail" aria-live="polite" hidden>
@@ -692,21 +701,73 @@
   addEventListener("resize", measureBars);
   const tabScroll = {};
   let currentTab = "structure";
-  tabs.forEach(tab => tab.addEventListener("click", () => {
-    if (tab.dataset.tab === currentTab) return;
-    tabScroll[currentTab] = scrollY;
+  // Fanerne ligger som to sider ved siden af hinanden: "Struktur" til venstre og "Regler og datapunkter"
+  // til højre, og et skift glider over til den anden side. Lavet med almindelig CSS og JavaScript
+  // (Web Animations), så det virker i alle nyere browsere. Har brugeren slået animationer fra i
+  // systemet, skiftes der uden glid.
+  const ORDER = ["structure", "overview"];
+  const SLIDE_MS = 380, EASE = "cubic-bezier(.4, 0, .2, 1)";
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const pages = document.getElementById("pages"), track = document.getElementById("track");
+  let sliding = null, pending = null;  // igangværende glid og det, der skal ske, når det er færdigt
+  function showTab(name, after) {
+    if (pending) {  // et skift midt i et glid gør først det igangværende færdigt
+      const done = pending;
+      pending = null;
+      sliding.cancel();
+      done();
+    }
+    if (name === currentTab) return after?.();
+    const from = currentTab, fromEl = document.getElementById("tab-" + from), toEl = document.getElementById("tab-" + name);
+    tabScroll[from] = scrollY;
     const start = document.getElementById("tabs-anchor").getBoundingClientRect().top + scrollY - navbar.offsetHeight;
+    const target = tabScroll[name] ?? Math.min(scrollY, start);
     tabs.forEach(other => {
-      const on = other === tab;
+      const on = other.dataset.tab === name;
       other.classList.toggle("active", on);
       other.setAttribute("aria-selected", on);
-      document.getElementById("tab-" + other.dataset.tab).hidden = !on;
     });
-    currentTab = tab.dataset.tab;
-    detail.hidden = currentTab !== "overview";
-    document.body.classList.toggle("with-detail", currentTab === "overview");
-    scrollTo({top: tabScroll[currentTab] ?? Math.min(scrollY, start), behavior: "instant"});
-  }));
+    currentTab = name;
+    const finish = () => {
+      fromEl.hidden = true;
+      toEl.style.transform = "";
+      pages.classList.remove("sliding");
+      detail.hidden = name !== "overview";
+      detail.style.transform = "";
+      document.body.classList.toggle("with-detail", name === "overview");
+      scrollTo({top: target, behavior: "instant"});
+      after?.();
+    };
+    if (reduceMotion.matches || !track.animate) { toEl.hidden = false; return finish(); }
+
+    // Begge sider ses under glidet. Den nye side forskydes lodret, så den står, hvor den skal stå
+    // efter glidet, mens siden ikke er rullet endnu; til sidst fjernes forskydningen og siden rulles.
+    toEl.hidden = false;
+    pages.classList.add("sliding");
+    toEl.style.transform = `translateY(${scrollY - target}px)`;
+    const forward = ORDER.indexOf(name) > ORDER.indexOf(from);
+    const shift = -(fromEl.getBoundingClientRect().width + parseFloat(getComputedStyle(track).columnGap || 0));
+    const [x0, x1] = forward ? [0, shift] : [shift, 0];
+    sliding = track.animate([{transform: `translateX(${x0}px)`}, {transform: `translateX(${x1}px)`}],
+                            {duration: SLIDE_MS, easing: EASE});
+    // Detaljepanelet hører til siden til højre og glider med den
+    if (name === "overview") {
+      detail.hidden = false;
+      detail.animate([{transform: "translateX(100vw)"}, {transform: "none"}], {duration: SLIDE_MS, easing: EASE});
+    } else if (!detail.hidden) {
+      detail.style.transform = "translateX(100vw)";  // slutstillingen; finish skjuler panelet og nulstiller
+      detail.animate([{transform: "none"}, {transform: "translateX(100vw)"}], {duration: SLIDE_MS, easing: EASE});
+    }
+    pending = finish;
+    const settle = () => {
+      if (pending !== finish) return;
+      pending = null;
+      finish();
+    };
+    sliding.finished.then(settle, () => {});  // et afbrudt glid afsluttes af det næste skift
+    setTimeout(settle, SLIDE_MS + 150);  // sikkerhedsline, hvis browseren ikke afspiller animationen færdig
+  }
+  tabs.forEach(tab => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
   const overviewFilter = document.getElementById("overview-filter");
   overviewFilter.addEventListener("input", () => {
     const query = overviewFilter.value.trim().toLowerCase();
@@ -733,11 +794,12 @@
     if (!row) return;
     e.preventDefault();  // ellers foldes blokken sammen, når der klikkes i dens overskrift
     if (row.hidden) { overviewFilter.value = ""; overviewFilter.dispatchEvent(new Event("input")); }
-    document.querySelector('[data-tab="overview"]').click();
-    row.scrollIntoView({block: "center", behavior: "instant"});
-    row.classList.remove("flash");
-    void row.offsetWidth;  // genstart animationen
-    row.classList.add("flash");
+    showTab("overview", () => {
+      row.scrollIntoView({block: "center", behavior: "instant"});
+      row.classList.remove("flash");
+      void row.offsetWidth;  // genstart animationen
+      row.classList.add("flash");
+    });
   });
 
   // Klik i indekset finder altid afsnittet: det tændes, de ydre blokke foldes ud, og det blinker kort
