@@ -4,10 +4,7 @@ Gør Word-skabeloner med indlejrede `<<...>>`-regler overskuelige. Skabelonen vi
 sammenfoldeligt træ, så man kan se, hvilke blokke der hører sammen, hvor de lukkes, og hvor en lukning
 mangler. Der er også en oversigt over alle regler og datapunkter, som kan eksporteres til Excel eller CSV.
 
-Værktøjet findes i to udgaver:
-
-- **En lille webapp** (Flask), der kører lokalt i browseren.
-- **Et terminalprogram**, der printer træet med farver.
+Værktøjet er en lille webapp (Flask), der kører lokalt i browseren.
 
 ## Kom i gang
 
@@ -94,20 +91,6 @@ Kataloget forventes at være et map, hvor hver nøgle er en regel eller et datap
 En kode tæller som fundet, hvis den står som nøgle (evt. med navnerum, fx `:regel/R895b`) eller
 forrest i `:titel` før et kolon. Store og små bogstaver er ligegyldige.
 
-## Terminalprogrammet
-
-```
-python print_rules.py                       # test_document.docx
-python print_rules.py skabelon.docx         # en Word-fil
-python print_rules.py skabelon.docx --hide-strike
-python print_rules.py regler.txt            # en tekstfil
-python print_rules.py -s '<<K1 <<Hvis x (R1=TRUE)\ntekst\n>>K1>>'
-python print_rules.py -                     # læs fra stdin
-```
-
-`--no-color` slår farver fra, og `--width N` sætter bredden. På tekstfiler kræver terminalprogrammet
-kun Pythons standardbibliotek.
-
 ## Syntaksen, som parseren forstår
 
 - `<<NAVN ... NAVN>>` – navngiven blok (`K970a`, `LOOP`, `BLOK 187 [...]`). En blok lukkes af
@@ -135,10 +118,9 @@ lukkes en ydre blok ved navn, regnes alle åbne blokke inden i den som ulukkede.
 | `overview.py` | Finder regler og datapunkter og skriver CSV og XLSX. Kun standardbibliotek. |
 | `catalog.py` | Læser kataloget (EDN) og stien til det fra `config.ini`. Kun standardbibliotek. |
 | `app.py`, `templates/index.html`, `static/` | Webappen. Bootstrap ligger i `static/`, så siden virker uden internet. |
-| `print_rules.py` | Terminalprogrammet. |
 | `test_document.docx` | Opdigtet skabelon til afprøvning. |
 
-Der er ingen automatiske tests; kontrollér ændringer ved at køre begge visninger på `test_document.docx`.
+Der er ingen automatiske tests; kontrollér ændringer ved at køre appen på `test_document.docx`.
 
 ## Rigtige skabeloner og kataloger
 

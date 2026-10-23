@@ -11,7 +11,7 @@ private område): STRIKE_ON/STRIKE_OFF omkring overstreget tekst, STRUCK lige fo
 << eller >>, HEADING + niveau (1-9) først på en linje, der er en overskrift, og ROW først på en
 linje, der er en tabelrække, med CELL mellem cellerne.
 
-Bruges af både print_rules.py (terminal) og app.py (Flask).
+Bruges af app.py (Flask).
 """
 from __future__ import annotations
 
