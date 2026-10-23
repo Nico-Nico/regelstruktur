@@ -135,12 +135,22 @@ def flat(item) -> str:
     return item.opener + "".join(flat(c) for c in item.children) + (item.closer or "")
 
 
+CONDITION = re.compile(r"\W*hvis\b", re.IGNORECASE)
+
+
 def split_header(node: Node) -> tuple[str, list]:
-    """Del en blok i overskrift (første linje) og indhold."""
+    """Del en blok i overskrift (første linje) og indhold.
+
+    I en Hvis-blok er hele første linje betingelsen, også indlejrede <<...>> som <<K953=TRUE (...)K953>>.
+    I andre blokke (BLOK, K-blokke, FORMATERINGSREGEL, Layout ...) er overskriften kun navnet: en hel
+    <<...>> længere henne på linjen er blokkens første element og hører til indholdet.
+    """
+    first = node.children[0] if node.children and isinstance(node.children[0], str) else ""
+    named = not CONDITION.match(MARKS.sub("", first))
     header = ""
     for i, child in enumerate(node.children):
         if isinstance(child, Node):
-            if not child.is_inline():
+            if not child.is_inline() or (named and MARKS.sub("", header).strip()):
                 return header, node.children[i:]
             header += flat(child)
         elif "\n" in child:

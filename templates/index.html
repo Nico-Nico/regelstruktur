@@ -313,7 +313,7 @@
       <div class="card-body p-2">
         <ul class="list-unstyled mb-0">
           {% for entry in index %}
-          <li class="{{ entry.kind }}{{ ' all-struck' if entry.struck }}{{ ' head-struck' if entry.head_struck }}" style="--indent: {{ entry.indent }}">
+          <li class="{{ entry.kind }}{{ ' all-struck' if entry.struck }}{{ ' head-struck' if entry.head_struck }}" style="--indent: {{ entry.indent }}" data-indent="{{ entry.indent }}">
             <input type="checkbox" class="form-check-input" checked data-target="{{ entry.id }}" aria-label="Vis {{ entry.title }}">
             <a href="#{{ entry.id }}" title="{{ entry.title }}">{{ entry.html }}</a>
           </li>
@@ -471,6 +471,29 @@
     try { localStorage.setItem("hideStrike", hide ? "1" : ""); } catch (e) {}
     // Udpakkede blokke har ingen overskrift at klikke på, så de skal være foldet ud
     if (hide) document.querySelectorAll("details.block.head-struck:not(.all-struck)").forEach(d => d.open = true);
+    relevel(hide);
+  }
+
+  // Når en blok pakkes ud, rykker alt inden i den et niveau op: farverne følger det nye niveau, og
+  // indekset rykker tilsvarende ud. Viser man overstreget tekst igen, gælder den oprindelige indlejring.
+  function relevel(hide) {
+    const tree = document.querySelector(".tree");
+    const unwrapped = el => hide && el.matches("details.block.head-struck:not(.all-struck)");
+    const lifted = el => {  // antal udpakkede blokke uden om elementet
+      let n = 0;
+      for (let d = el.parentElement.closest("details.block"); d && tree.contains(d); d = d.parentElement.closest("details.block")) n += unwrapped(d);
+      return n;
+    };
+    tree.querySelectorAll("details.block").forEach(block => {
+      let depth = 0;
+      for (let d = block.parentElement.closest("details.block"); d && tree.contains(d); d = d.parentElement.closest("details.block")) depth += !unwrapped(d);
+      block.classList.remove("d0", "d1", "d2", "d3", "d4");
+      block.classList.add("d" + depth % 5);
+    });
+    document.querySelectorAll(".index li[data-indent]").forEach(li => {
+      const el = document.getElementById(li.querySelector("input").dataset.target);
+      li.style.setProperty("--indent", Math.max(0, Number(li.dataset.indent) - (el ? lifted(el) : 0)));
+    });
   }
   strikeBtn.addEventListener("click", () => hideStrike(!document.body.classList.contains("hide-strike")));
   try { if (localStorage.getItem("hideStrike") && !strikeBtn.disabled) hideStrike(true); } catch (e) {}

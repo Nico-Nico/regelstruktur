@@ -113,8 +113,10 @@ kun Pythons standardbibliotek.
 - `<<NAVN ... NAVN>>` – navngiven blok (`K970a`, `LOOP`, `BLOK 187 [...]`). En blok lukkes af
   begyndelsen af sin første linje: hele linjen, de første ord eller kun første ord, uanset store og
   små bogstaver. `<<BLOK 187 [Bonusfritekstfelt]` lukkes altså af `Blok 187>>`.
-- `<<Hvis betingelse` + linjeskift + indhold + `>>` – betingelsen er første linje. Et bart `>>`
-  lukker altid den inderste åbne blok.
+- `<<Hvis betingelse` + linjeskift + indhold + `>>` – betingelsen er hele første linje, også indlejrede
+  `<<K953=TRUE (…)K953>>`. Et bart `>>` lukker altid den inderste åbne blok.
+- I andre blokke (BLOK, K-blokke, FORMATERINGSREGEL, Layout, LOOP …) er overskriften kun navnet: står
+  der en hel `<<…>>` efter navnet på samme linje, er den blokkens første element.
 - `<Layout: navn ... Layout>>` – kan også åbnes med kun ét `<`.
 - `<<140dGV adresse referenceejendom>>` – flettefelt/datapunkt. Alt, der åbnes og lukkes uden
   linjeskift, vises på én linje.
